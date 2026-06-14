@@ -40,10 +40,19 @@ The exact included findings are still controlled by the deterministic finding sc
 
 ## Navigation
 
-Generated packets include PDF bookmarks for the cover, issue index, critical/major list, marked-up drawing set, drawing-page finding clusters, rendered reference inputs, and source map. Issue IDs in the front matter are internal PDF links to the related marked-up drawing page when the viewer supports PDF links. Coordinate-backed drawing markups also carry a small visible issue-ID label, such as `AR-0022`, near the highlighted evidence so the drawing page can be reconciled back to the issue index and UI.
+Generated packets include PDF bookmarks for the cover, issue index, critical/major list, marked-up drawing set, drawing-page finding clusters, rendered reference inputs, and source map. Issue IDs in the front matter are internal PDF links to the related marked-up drawing page when the viewer supports PDF links.
+
+The Marked-Up Drawing Set uses two visible markup styles:
+
+- Exact-location markups: findings with valid coordinates get the existing rectangle markup around the matched drawing evidence plus a visible `AR-####` issue-ID label near the rectangle.
+- Page-level callouts: findings with a valid page number but missing, zero, or invalid coordinates get a stacked callout box on the related drawing page. The callout includes issue ID, severity, rule ID, and reviewer-edited message. This makes coordinate-less findings visible instead of silently dropping them.
+
+If a finding cannot be placed because its page number is invalid or outside the drawing set, it is counted as unplaced in the run manifest.
 
 ## Traceability
 
 The same stable issue ID appears in the UI, SQLite, PDF markups, issue index, run manifest, `finding_traceability.csv`, and support exports. Reviewer-edited wording is used in the packet; original generated wording remains stored with the finding.
 
 Reference CSV/XLSX inputs are rendered into the packet when included, and the desktop reference mapping preview should be checked before export so reviewers can trust which columns drove list-based evidence.
+
+After packet export, `run_manifest.json` includes `packet_markup_counts` with `coordinate_backed_markups`, `fallback_page_callouts`, and `unplaced_findings`.

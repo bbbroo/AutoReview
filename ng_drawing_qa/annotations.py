@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any
+import math
 import textwrap
 import fitz
 
@@ -17,13 +18,18 @@ def _rect(issue: Issue) -> fitz.Rect:
     return fitz.Rect(issue.x0, issue.y0, issue.x1, issue.y1)
 
 
+def _has_valid_coordinates(issue: Issue) -> bool:
+    values = [issue.x0, issue.y0, issue.x1, issue.y1]
+    return all(math.isfinite(float(value)) for value in values) and issue.x1 > issue.x0 and issue.y1 > issue.y0
+
+
 def _label_fill(color: tuple[float, float, float]) -> tuple[float, float, float]:
     return tuple(min(1.0, 0.82 + channel * 0.18) for channel in color)
 
 
 def _issue_label_rect(page: fitz.Page, rect: fitz.Rect, text: str, fontsize: float) -> fitz.Rect:
-    width = min(max(46.0, len(text) * fontsize * 0.7 + 12.0), 120.0)
-    height = max(14.0, fontsize + 8.0)
+    width = min(max(72.0, len(text) * fontsize * 0.9 + 18.0), 140.0)
+    height = max(20.0, fontsize + 12.0)
     x0 = min(max(0.0, rect.x0), max(0.0, page.rect.width - width))
     if rect.y0 >= height + 4:
         y0 = rect.y0 - height - 2
@@ -54,11 +60,8 @@ def add_issue_id_label(
     label_rect = _issue_label_rect(page, rect, text, fontsize)
     try:
         page.draw_rect(label_rect, color=color, fill=_label_fill(color), width=0.5, overlay=True)
-        label = page.add_freetext_annot(
-            label_rect,
-            text,
-            fontsize=fontsize,
-        )
+        page.insert_textbox(label_rect + (3, 2, -3, -2), text, fontsize=fontsize, fontname="helv", color=(0, 0, 0), overlay=True)
+        label = page.add_freetext_annot(label_rect, text, fontsize=fontsize, fill_color=_label_fill(color), border_color=color)
         label.set_border(width=0.5)
         label.set_info(
             title="Natural Gas QA",
@@ -70,11 +73,21 @@ def add_issue_id_label(
         pass
 
 
-def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -> None:
+def _issue_content(issue: Issue) -> str:
+    return (
+        f"{issue.issue_id} | {issue.status}\n"
+        f"Rule: {issue.rule_id}\n"
+        f"Severity: {issue.severity}\n"
+        f"Confidence: {issue.confidence:.2f}\n\n"
+        f"{issue.message}"
+    )
+
+
+def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -> bool:
     if issue.page_number < 1 or issue.page_number > doc.page_count:
-        return
-    if issue.x1 <= issue.x0 or issue.y1 <= issue.y0:
-        return
+        return False
+    if not _has_valid_coordinates(issue):
+        return False
 
     page = doc[issue.page_number - 1]
     color = color_for(config, issue.severity)
@@ -85,13 +98,7 @@ def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -
     rect.x1 = min(page.rect.width, rect.x1 + pad)
     rect.y1 = min(page.rect.height, rect.y1 + pad)
 
-    content = (
-        f"{issue.issue_id} | {issue.status}\n"
-        f"Rule: {issue.rule_id}\n"
-        f"Severity: {issue.severity}\n"
-        f"Confidence: {issue.confidence:.2f}\n\n"
-        f"{issue.message}"
-    )
+    content = _issue_content(issue)
     subject = issue.subject
 
     try:
@@ -102,6 +109,47 @@ def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -
         a.update()
     except Exception:
         pass
+    return True
+
+
+def _fallback_callout_rect(page: fitz.Page, index: int) -> fitz.Rect:
+    width = min(330.0, max(180.0, page.rect.width - 72.0))
+    height = 62.0
+    gap = 8.0
+    x0 = max(24.0, page.rect.width - width - 24.0)
+    y0 = 84.0 + index * (height + gap)
+    max_y0 = max(84.0, page.rect.height - height - 24.0)
+    if y0 > max_y0:
+        column = int((y0 - 84.0) // max(1.0, max_y0 - 84.0 + height + gap))
+        x0 = max(24.0, x0 - column * (width + 12.0))
+        y0 = 84.0 + (index % max(1, int((max_y0 - 84.0) // (height + gap) + 1))) * (height + gap)
+    x0 = min(max(24.0, x0), max(24.0, page.rect.width - width - 24.0))
+    return fitz.Rect(x0, y0, x0 + width, y0 + height)
+
+
+def add_page_level_callout(doc: fitz.Document, issue: Issue, config: dict[str, Any], index: int) -> bool:
+    if issue.page_number < 1 or issue.page_number > doc.page_count:
+        return False
+
+    page = doc[issue.page_number - 1]
+    color = color_for(config, issue.severity)
+    rect = _fallback_callout_rect(page, index)
+    content = _issue_content(issue)
+    message = textwrap.shorten(str(issue.message or ""), width=150, placeholder="...")
+    visible = f"{issue.issue_id} | {issue.severity} | {issue.rule_id}\n{message}"
+    try:
+        page.draw_rect(rect, color=color, fill=_label_fill(color), width=0.8, overlay=True)
+        callout = page.add_freetext_annot(rect + (5, 4, -5, -4), visible, fontsize=7.5)
+        callout.set_border(width=0.8)
+        callout.set_info(
+            title="Natural Gas QA",
+            subject=f"{issue.issue_id} - Page Callout",
+            content=content,
+        )
+        callout.update()
+        return True
+    except Exception:
+        return False
 
     add_issue_id_label(page, rect, issue, config, color, content)
 
@@ -189,17 +237,34 @@ def add_sheet_summary_annotations(doc: fitz.Document, issues: list[Issue], confi
             pass
 
 
-def annotate_pdf(doc: fitz.Document, issues: list[Issue], config: dict[str, Any]) -> None:
+def annotate_pdf(doc: fitz.Document, issues: list[Issue], config: dict[str, Any]) -> dict[str, int]:
+    stats = {
+        "coordinate_backed_markups": 0,
+        "fallback_page_callouts": 0,
+        "unplaced_findings": 0,
+    }
     if config.get("outputs", {}).get("dry_run", False) or not config.get("outputs", {}).get("annotate_pdf", True):
-        return
+        stats["unplaced_findings"] = len(issues)
+        return stats
 
-    max_per_rule_page = int(config.get("annotation", {}).get("max_individual_markups_per_rule_page", 10))
-    seen_count: dict[tuple[str, int], int] = defaultdict(int)
+    fallback_counts_by_page: dict[int, int] = defaultdict(int)
     for issue in issues:
-        key = (issue.rule_id, issue.page_number)
-        seen_count[key] += 1
-        if seen_count[key] <= max_per_rule_page:
-            add_issue_markup(doc, issue, config)
+        if issue.page_number < 1 or issue.page_number > doc.page_count:
+            stats["unplaced_findings"] += 1
+            continue
+        if _has_valid_coordinates(issue):
+            if add_issue_markup(doc, issue, config):
+                stats["coordinate_backed_markups"] += 1
+            else:
+                stats["unplaced_findings"] += 1
+            continue
+        fallback_index = fallback_counts_by_page[issue.page_number]
+        fallback_counts_by_page[issue.page_number] += 1
+        if add_page_level_callout(doc, issue, config, fallback_index):
+            stats["fallback_page_callouts"] += 1
+        else:
+            stats["unplaced_findings"] += 1
 
     add_sheet_summary_annotations(doc, issues, config)
     add_summary_page(doc, issues, config)
+    return stats

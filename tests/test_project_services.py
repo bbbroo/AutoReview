@@ -51,6 +51,14 @@ def _seed_sample_project(tmp_path: Path):
     return project, repo
 
 
+def _set_finding_coordinates(repo: ProjectRepository, finding_id: str, x0: float, y0: float, x1: float, y1: float) -> None:
+    with repo.connect() as conn:
+        conn.execute(
+            "UPDATE findings SET x0 = ?, y0 = ?, x1 = ?, y1 = ? WHERE id = ?",
+            (x0, y0, x1, y1, finding_id),
+        )
+
+
 def test_infer_file_role_for_common_reference_names():
     assert infer_file_role(Path("valve_list.xlsx")) == FileRole.VALVE_LIST
     assert infer_file_role(Path("drawing_index.csv")) == FileRole.DRAWING_INDEX
@@ -89,6 +97,8 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     backcheck_finding = next(
         finding for finding in findings if finding.id not in {accepted_primary.id, accepted_secondary.id, rejected_finding.id}
     )
+    _set_finding_coordinates(repo, accepted_secondary.id, 0, 0, 0, 0)
+    _set_finding_coordinates(repo, rejected_finding.id, 0, 0, 0, 0)
     repo.patch_finding(accepted_primary.id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
     repo.patch_finding(rejected_finding.id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
     repo.patch_finding(
@@ -118,10 +128,16 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
         ]
         drawing_divider_page_num = next(item[2] for item in toc if item[1] == "Marked-Up Drawing Set")
         reference_divider_page_num = next(item[2] for item in toc if item[1] == "Rendered Reference Inputs")
-        drawing_label_subjects = []
+        drawing_text = "\n".join(
+            packet_doc[page_index].get_text()
+            for page_index in range(drawing_divider_page_num, reference_divider_page_num - 1)
+        )
+        drawing_callout_subjects = []
+        drawing_annotation_text = []
         for page_index in range(drawing_divider_page_num, reference_divider_page_num - 1):
             annots = list(packet_doc[page_index].annots() or [])
-            drawing_label_subjects.extend((annot.info or {}).get("subject", "") for annot in annots)
+            drawing_callout_subjects.extend((annot.info or {}).get("subject", "") for annot in annots)
+            drawing_annotation_text.extend((annot.info or {}).get("content", "") for annot in annots)
     assert "Issue Index" in packet_text
     assert "Marked-Up Drawing Set" in packet_text
     assert "Rendered Reference Inputs" in packet_text
@@ -134,7 +150,19 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert "Rendered Reference Inputs" in toc_titles
     assert "Packet Source Map" in toc_titles
     assert any(link["kind"] == fitz.LINK_GOTO for link in front_links)
-    assert f"{accepted_primary.issue_id} - Issue ID Label" in drawing_label_subjects
+    assert (
+        accepted_primary.issue_id in drawing_text
+        or f"{accepted_primary.issue_id} - Issue ID Label" in drawing_callout_subjects
+        or any(accepted_primary.issue_id in content for content in drawing_annotation_text)
+    )
+    assert f"{accepted_secondary.issue_id} - Page Callout" in drawing_callout_subjects
+    assert accepted_secondary.issue_id in drawing_text
+
+    accepted_manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert accepted_manifest["packet_finding_count"] == 2
+    assert accepted_manifest["packet_markup_counts"]["coordinate_backed_markups"] == 1
+    assert accepted_manifest["packet_markup_counts"]["fallback_page_callouts"] == 1
+    assert accepted_manifest["packet_markup_counts"]["unplaced_findings"] == 0
 
     repo.patch_finding(backcheck_finding.id, FindingPatch(status=FindingStatus.BACKCHECK_REQUIRED, edited_message="Backcheck-required wording."))
     backcheck_packet = export_review_packet(
@@ -184,7 +212,19 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     )
     with fitz.open(full_debug_packet.packet_path) as packet_doc:
         full_debug_text = "\n".join(page.get_text() for page in packet_doc)
+        full_debug_callout_subjects = [
+            (annot.info or {}).get("subject", "")
+            for page_index in range(packet_doc.page_count)
+            for annot in list(packet_doc[page_index].annots() or [])
+        ]
     assert rejected_finding.issue_id in full_debug_text
+    assert f"{rejected_finding.issue_id} - Page Callout" in full_debug_callout_subjects
+
+    debug_manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert debug_manifest["packet_finding_count"] == len(findings)
+    assert debug_manifest["packet_markup_counts"]["fallback_page_callouts"] >= 2
+    assert debug_manifest["packet_markup_counts"]["coordinate_backed_markups"] >= 1
+    assert debug_manifest["packet_markup_counts"]["unplaced_findings"] == 0
 
 
 def test_reviewer_decision_history_tracks_finding_edits(tmp_path: Path):

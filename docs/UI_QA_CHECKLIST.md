@@ -79,7 +79,9 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 5. Confirm the PDF bookmark/sidebar outline includes the cover, issue index, critical/major list, marked-up drawing set, rendered reference inputs, and source map.
 6. Click at least one issue ID in the issue index and confirm it jumps to the related marked-up drawing page when the viewer supports internal links.
 7. On a marked-up drawing page, confirm coordinate-backed findings show a visible `AR-####` issue-ID label near the highlighted evidence.
-8. Confirm the packet contains:
+8. Confirm findings without usable coordinates but with a valid page number show a stacked page-level callout box on the related drawing page. The callout should include issue ID, severity, rule ID, and edited reviewer wording.
+9. Check `outputs/runs/{run_id}/run_manifest.json` and confirm `packet_markup_counts` reports coordinate-backed markups, fallback page callouts, and unplaced findings.
+10. Confirm the packet contains:
    - Cover/disclaimer.
    - Issue summary and issue index.
    - Critical/major list.
@@ -87,11 +89,11 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
    - Marked-up drawing pages.
    - Rendered reference input section.
    - Source map.
-9. Confirm rejected findings are absent from the default packet.
-10. Change Packet Mode to backcheck and confirm Finding Scope changes to backcheck.
-11. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
-12. Change Packet Mode to full debug and confirm Finding Scope changes to all.
-13. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected.
+11. Confirm rejected findings are absent from the default packet.
+12. Change Packet Mode to backcheck and confirm Finding Scope changes to backcheck.
+13. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
+14. Change Packet Mode to full debug and confirm Finding Scope changes to all.
+15. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected, including page-level callouts for coordinate-less findings.
 
 ## Run History And Comparison
 

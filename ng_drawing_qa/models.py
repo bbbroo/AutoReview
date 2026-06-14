@@ -112,6 +112,7 @@ class RunManifest:
     marked_up_pdf_path: str = ""
     packet_export_settings: dict[str, Any] = field(default_factory=dict)
     packet_finding_count: int = 0
+    packet_markup_counts: dict[str, int] = field(default_factory=dict)
     settings_used: dict[str, Any] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
     validation_warnings: list[str] = field(default_factory=list)

@@ -100,6 +100,7 @@ def _update_run_manifest_after_packet(
     all_findings: list[FindingRecord],
     selected_count: int,
     settings: PacketExportSettings,
+    markup_counts: dict[str, int],
 ) -> None:
     manifest_path = run_output_dir / "run_manifest.json"
     if manifest_path.exists():
@@ -137,6 +138,7 @@ def _update_run_manifest_after_packet(
         marked_up_pdf_path=str(marked_path),
         packet_export_settings=settings.model_dump(mode="json"),
         packet_finding_count=selected_count,
+        packet_markup_counts=markup_counts,
         settings_used=dict(data.get("settings_used", {})),
         warnings=list(data.get("warnings", [])),
         validation_warnings=list(data.get("validation_warnings", [])),
@@ -213,13 +215,13 @@ def export_review_packet(
 
     doc = fitz.open(drawing.local_path)
     try:
-        annotate_pdf(doc, issues, config)
+        markup_counts = annotate_pdf(doc, issues, config)
         marked_path = run.output_dir / f"{Path(drawing.file_name).stem}_reviewed_marked_up.pdf"
         marked_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(marked_path, garbage=4, deflate=True)
         supplemental = _supplemental_reference_files(files) if settings.include_reference_inputs else []
         build_single_review_packet(doc, issues, refs if settings.include_reference_inputs else {}, packet_path, config, supplemental_reference_files=supplemental)
-        _update_run_manifest_after_packet(run.output_dir, packet_path, marked_path, all_findings, len(issues), settings)
+        _update_run_manifest_after_packet(run.output_dir, packet_path, marked_path, all_findings, len(issues), settings, markup_counts)
     except Exception as exc:
         raise ValidationError(f"Packet export failed: {exc}") from exc
     finally:
