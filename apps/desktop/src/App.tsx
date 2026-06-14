@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   Badge,
   Button,
@@ -11,13 +11,28 @@ import {
 } from "@fluentui/react-components";
 import {
   Add24Regular,
-  ArrowClockwise24Regular,
+  Alert24Regular,
+  ArrowSync24Regular,
+  ArrowUpload24Regular,
   CheckmarkCircle24Regular,
+  ChevronRight24Regular,
+  Cloud24Regular,
+  Cube24Regular,
   DismissCircle24Regular,
+  Document24Regular,
+  DocumentBulletList24Regular,
   DocumentPdf24Regular,
+  Folder24Regular,
   FolderOpen24Regular,
+  HatGraduation24Regular,
+  History24Regular,
+  Info24Regular,
   Play24Regular,
-  Save24Regular
+  PlayCircle24Regular,
+  Save24Regular,
+  Settings24Regular,
+  Sparkle24Regular,
+  Warning24Regular
 } from "@fluentui/react-icons";
 import { api } from "./api";
 import type {
@@ -26,12 +41,12 @@ import type {
   FindingRecord,
   FindingStatus,
   ProjectRecord,
+  RegressionResult,
   RuleMetadata,
   RunComparisonSummary,
   RunRecord,
   RunWithProgress,
   Severity,
-  RegressionResult,
   TrainingSetRecord,
   ValidationIssue
 } from "./types";
@@ -40,16 +55,16 @@ import "./styles.css";
 
 type Section = "setup" | "files" | "profiles" | "run" | "findings" | "export" | "history" | "training" | "settings";
 
-const sections: Array<{ id: Section; label: string }> = [
-  { id: "setup", label: "Project Setup" },
-  { id: "files", label: "Input Files" },
-  { id: "profiles", label: "Profiles & Rules" },
-  { id: "run", label: "Run Status" },
-  { id: "findings", label: "Findings Review" },
-  { id: "export", label: "Packet Export" },
-  { id: "history", label: "Run History" },
-  { id: "training", label: "Training" },
-  { id: "settings", label: "Settings" }
+const sections: Array<{ id: Section; label: string; icon: ReactNode }> = [
+  { id: "setup", label: "Project Setup", icon: <Folder24Regular /> },
+  { id: "files", label: "Input Files", icon: <FolderOpen24Regular /> },
+  { id: "profiles", label: "Profiles & Rules", icon: <Document24Regular /> },
+  { id: "run", label: "Run Status", icon: <PlayCircle24Regular /> },
+  { id: "findings", label: "Findings Review", icon: <DocumentBulletList24Regular /> },
+  { id: "export", label: "Packet Export", icon: <ArrowUpload24Regular /> },
+  { id: "history", label: "Run History", icon: <History24Regular /> },
+  { id: "training", label: "Training", icon: <HatGraduation24Regular /> },
+  { id: "settings", label: "Settings", icon: <Settings24Regular /> }
 ];
 
 const emptyFilters = {
@@ -61,6 +76,13 @@ const emptyFilters = {
   rfi: "",
   text: ""
 };
+
+const BOOTSTRAP_TIMEOUT_MS = 2500;
+
+function displayError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.toLowerCase().includes("failed to fetch") ? "Failed to fetch" : message;
+}
 
 function roleLabel(value: string) {
   return value.replaceAll("_", " ");
@@ -90,7 +112,7 @@ export default function App() {
   const [currentRun, setCurrentRun] = useState<RunWithProgress | null>(null);
   const [history, setHistory] = useState<RunRecord[]>([]);
   const [findings, setFindings] = useState<FindingRecord[]>([]);
-  const [selectedFindingId, setSelectedFindingId] = useState<string>("");
+  const [selectedFindingId, setSelectedFindingId] = useState("");
   const [filters, setFilters] = useState(emptyFilters);
   const [packetScope, setPacketScope] = useState("accepted_only");
   const [packetPath, setPacketPath] = useState("");
@@ -103,6 +125,8 @@ export default function App() {
   const [message, setMessage] = useState("");
 
   const selectedFinding = findings.find((item) => item.id === selectedFindingId) ?? findings[0] ?? null;
+  const currentSection = sections.find((item) => item.id === section);
+  const runPercent = currentRun?.progress.at(-1)?.percent ?? (currentRun?.run.status === "completed" ? 100 : 0);
 
   useEffect(() => {
     void bootstrap();
@@ -123,19 +147,19 @@ export default function App() {
 
   async function bootstrap() {
     try {
-      const [healthResult, projectList, ruleList, profileMap] = await Promise.all([
-        api.health(),
-        api.projects(),
-        api.rules(),
-        api.profiles()
-      ]);
+      const bootstrapData = Promise.all([api.health(), api.projects(), api.rules(), api.profiles()]);
+      const offlineTimeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Failed to fetch")), BOOTSTRAP_TIMEOUT_MS);
+      });
+      const [healthResult, projectList, ruleList, profileMap] = await Promise.race([bootstrapData, offlineTimeout]);
       setHealth(healthResult.mode);
       setProjects(projectList);
       setRules(ruleList);
       setProfiles(profileMap);
+      setMessage((current) => (current === "Failed to fetch" ? "" : current));
     } catch (error) {
       setHealth("backend unavailable");
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     }
   }
 
@@ -182,7 +206,7 @@ export default function App() {
       setSection("files");
       setMessage(`Project created: ${created.root_path}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     } finally {
       setBusy(false);
     }
@@ -198,7 +222,7 @@ export default function App() {
       await loadProjectData(opened);
       setSection("files");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     } finally {
       setBusy(false);
     }
@@ -211,11 +235,10 @@ export default function App() {
     setBusy(true);
     try {
       await api.ingestFiles(project.id, paths, newFileRole === "unknown" ? undefined : newFileRole);
-      const fileList = await api.files(project.id);
-      setFiles(fileList);
+      setFiles(await api.files(project.id));
       setValidation(await api.validate(project.id));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     } finally {
       setBusy(false);
     }
@@ -250,7 +273,7 @@ export default function App() {
       setPacketPath("");
       setSection("run");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     } finally {
       setBusy(false);
     }
@@ -270,7 +293,7 @@ export default function App() {
       setPacketPath(packet.packet_path);
       setMessage(`Packet exported with ${packet.finding_count} finding(s).`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(displayError(error));
     } finally {
       setBusy(false);
     }
@@ -330,234 +353,286 @@ export default function App() {
 
   const disciplines = Array.from(new Set(findings.map((item) => item.discipline).filter(Boolean))).sort();
   const ruleIds = Array.from(new Set(findings.map((item) => item.rule_id).filter(Boolean))).sort();
-  const runPercent = currentRun?.progress.at(-1)?.percent ?? (currentRun?.run.status === "completed" ? 100 : 0);
 
   return (
     <FluentProvider theme={webLightTheme}>
-      <div className="app-shell">
-        <aside className="sidebar">
-          <div className="brand">
-            <div className="brand-mark">AR</div>
-            <div>
-              <h1>AutoReview</h1>
-              <span>{health}</span>
+      <div className="desktop-stage">
+        <div className="app-shell">
+          <aside className="sidebar">
+            <div className="window-controls" aria-hidden="true">
+              <span className="traffic traffic-red" />
+              <span className="traffic traffic-yellow" />
+              <span className="traffic traffic-green" />
             </div>
-          </div>
-          <nav>
-            {sections.map((item) => (
-              <button key={item.id} className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)}>
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
-
-        <main className="workspace">
-          <header className="topbar">
-            <div>
-              <h2>{sections.find((item) => item.id === section)?.label}</h2>
-              <span>{project ? project.name : "No project open"}</span>
-            </div>
-            <div className="topbar-actions">
-              {busy && <Spinner size="tiny" />}
-              <Button icon={<ArrowClockwise24Regular />} onClick={() => void bootstrap()}>Refresh</Button>
-            </div>
-          </header>
-
-          {message && (
-            <div className="message">
-              <span>{message}</span>
-              <button onClick={() => setMessage("")}>Dismiss</button>
-            </div>
-          )}
-
-          {section === "setup" && (
-            <section className="panel setup-grid">
-              <div className="setup-form">
-                <label>Project name</label>
-                <Input value={projectName} onChange={(_, data) => setProjectName(data.value)} />
-                <label>Project parent folder</label>
-                <div className="path-row">
-                  <Input value={projectParent} onChange={(_, data) => setProjectParent(data.value)} />
-                  <Button icon={<FolderOpen24Regular />} onClick={() => void chooseDirectory()}>Browse</Button>
-                </div>
-                <div className="button-row">
-                  <Button appearance="primary" icon={<Add24Regular />} onClick={() => void createNewProject()}>Create Project</Button>
-                  <Button icon={<FolderOpen24Regular />} onClick={() => void openExistingProject()}>Open Project</Button>
-                </div>
-              </div>
-              <div className="recent-list">
-                <h3>Recent Projects</h3>
-                {projects.map((item) => (
-                  <button key={item.id} onClick={() => void loadProjectData(item)}>
-                    <strong>{item.name}</strong>
-                    <span>{item.root_path}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {section === "files" && (
-            <section className="panel">
-              <div className="toolbar">
-                <select value={newFileRole} onChange={(event) => setNewFileRole(event.target.value as FileRole)}>
-                  {FILE_ROLES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
-                </select>
-                <Button appearance="primary" icon={<Add24Regular />} disabled={!project} onClick={() => void browseAndIngestFiles()}>Add Files</Button>
-                <Button icon={<CheckmarkCircle24Regular />} disabled={!project} onClick={() => void validateInputs()}>Validate</Button>
-              </div>
-              <FileTable files={files} onRoleChange={updateRole} />
-              <ValidationList issues={validation} />
-            </section>
-          )}
-
-          {section === "profiles" && (
-            <section className="panel">
-              <div className="toolbar">
-                <label>Review profile</label>
-                <select value={profile} onChange={(event) => setProfile(event.target.value)}>
-                  {Object.keys(profiles).map((name) => <option key={name} value={name}>{name.replaceAll("_", " ")}</option>)}
-                </select>
-              </div>
-              <RulesTable rules={rules} />
-            </section>
-          )}
-
-          {section === "run" && (
-            <section className="panel">
-              <div className="run-summary">
-                <Button appearance="primary" icon={<Play24Regular />} disabled={!project || busy || currentRun?.run.status === "running"} onClick={() => void startRun()}>
-                  Run Review
-                </Button>
-                <div>
-                  <strong>{currentRun?.run.status ?? "not started"}</strong>
-                  <span>{currentRun?.run.issue_count ?? 0} finding(s), {currentRun?.run.page_count ?? 0} page(s)</span>
-                </div>
-              </div>
-              <ProgressBar value={runPercent / 100} />
-              <ol className="progress-list">
-                {currentRun?.progress.map((event) => (
-                  <li key={event.id} className={event.level === "error" ? "error" : ""}>
-                    <span>{event.step}</span>
-                    <p>{event.message}</p>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-
-          {section === "findings" && (
-            <section className="findings-layout">
-              <div className="panel findings-table-panel">
-                <FindingFilters
-                  filters={filters}
-                  setFilters={setFilters}
-                  disciplines={disciplines}
-                  ruleIds={ruleIds}
-                />
-                <FindingsTable
-                  findings={filteredFindings}
-                  selectedId={selectedFinding?.id ?? ""}
-                  onSelect={setSelectedFindingId}
-                  onPatch={patchFinding}
-                />
-              </div>
-              <FindingDetail finding={selectedFinding} onPatch={patchFinding} />
-            </section>
-          )}
-
-          {section === "export" && (
-            <section className="panel">
-              <div className="toolbar">
-                <label>Finding scope</label>
-                <select value={packetScope} onChange={(event) => setPacketScope(event.target.value)}>
-                  <option value="accepted_only">accepted only</option>
-                  <option value="accepted_and_needs_review">accepted and needs review</option>
-                  <option value="all_non_rejected">all non-rejected</option>
-                  <option value="all">all findings</option>
-                </select>
-                <Button appearance="primary" icon={<DocumentPdf24Regular />} disabled={!currentRun} onClick={() => void exportPacket()}>Export Packet</Button>
-                <Button disabled={!packetPath || !window.autoreview} onClick={() => void openPacket()}>Open Packet</Button>
-              </div>
-              {packetPath && <div className="output-path">{packetPath}</div>}
-            </section>
-          )}
-
-          {section === "history" && (
-            <section className="panel">
-              <div className="toolbar">
-                <Button disabled={history.length < 2} onClick={() => void compareLatestRuns()}>Compare Latest Runs</Button>
-              </div>
-              <RunHistory runs={history} onOpen={(run) => void loadRunDetails(run.id)} />
-              {comparison && <ComparisonSummary comparison={comparison} />}
-            </section>
-          )}
-
-          {section === "training" && (
-            <section className="panel training-panel">
-              <div className="toolbar">
-                <Button disabled={!project || !currentRun} onClick={() => void createTrainingFromRun()}>Create Training Set</Button>
-                <select value={selectedTrainingSetId} onChange={(event) => setSelectedTrainingSetId(event.target.value)}>
-                  <option value="">training set</option>
-                  {trainingSets.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-                <Button disabled={!selectedTrainingSetId || !selectedFinding} onClick={() => void labelSelectedFalsePositive()}>Mark False Positive</Button>
-                <Button disabled={!selectedTrainingSetId} onClick={() => void runTrainingRegression()}>Run Regression</Button>
-              </div>
-              <div className="training-grid">
-                <div>
-                  <h3>Training Sets</h3>
-                  <table className="data-table">
-                    <thead><tr><th>Name</th><th>Source Run</th><th>Golden</th></tr></thead>
-                    <tbody>
-                      {trainingSets.map((item) => (
-                        <tr key={item.id} onClick={() => setSelectedTrainingSetId(item.id)}>
-                          <td><strong>{item.name}</strong><span>{item.id}</span></td>
-                          <td className="mono">{item.source_run_id ?? ""}</td>
-                          <td>{item.golden_path ? "yes" : "no"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div>
-                  <h3>Missed Finding</h3>
-                  <Textarea value={missedMessage} resize="vertical" onChange={(_, data) => setMissedMessage(data.value)} />
-                  <Button disabled={!selectedTrainingSetId || !missedMessage.trim()} onClick={() => void addMissedFromForm()}>Add Missed Finding</Button>
-                  {regression && (
-                    <div className="regression-result">
-                      <div><strong>{regression.expected_count}</strong><span>expected</span></div>
-                      <div><strong>{regression.actual_count}</strong><span>actual</span></div>
-                      <div><strong>{regression.missing_fingerprints.length}</strong><span>missing</span></div>
-                      <div><strong>{regression.new_fingerprints.length}</strong><span>new</span></div>
-                      <div><strong>{regression.changed.length}</strong><span>changed</span></div>
-                      <div><strong>{regression.false_positive_count}</strong><span>false positive</span></div>
-                      <div><strong>{regression.missed_finding_count}</strong><span>missed</span></div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {section === "settings" && (
-            <section className="panel settings-grid">
+            <div className="brand">
+              <div className="brand-mark">AR</div>
               <div>
-                <h3>Local Processing</h3>
-                <p>Backend: {health}</p>
-                <p>Project database: {project?.database_path ?? "none"}</p>
+                <h1>AutoReview</h1>
+                <span>{health}</span>
               </div>
-              <div>
-                <h3>Current Review Profile</h3>
-                <p>{profile}</p>
-                <p>{rules.filter((rule) => rule.enabled_by_default).length} default deterministic rules listed.</p>
+            </div>
+            <nav>
+              {sections.map((item) => (
+                <button key={item.id} className={section === item.id ? "active" : ""} onClick={() => setSection(item.id)}>
+                  <span className="nav-icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </nav>
+            <button className="backend-card" type="button" onClick={() => void bootstrap()}>
+              <span className="backend-icon"><Cloud24Regular /></span>
+              <span>
+                <strong>Backend Status</strong>
+                <small className={health === "local-only" ? "available" : "unavailable"}>{health === "local-only" ? "Available" : "Unavailable"}</small>
+              </span>
+              <ChevronRight24Regular />
+            </button>
+          </aside>
+
+          <main className="workspace">
+            <header className="topbar">
+              <div className="topbar-title">
+                <div className="header-orb"><Cube24Regular /></div>
+                <div>
+                  <h2>{currentSection?.label}</h2>
+                  <span><i />{project ? project.name : "No project open"}</span>
+                </div>
               </div>
-            </section>
-          )}
-        </main>
+              <div className="topbar-actions">
+                {busy && <Spinner size="tiny" />}
+                <Button className="header-button" icon={<ArrowSync24Regular />} onClick={() => void bootstrap()}>Refresh</Button>
+                <span className="header-divider" />
+                <button className="icon-button" type="button" aria-label="Notifications"><Alert24Regular /></button>
+                <button className="avatar-button" type="button" aria-label="Account">AR</button>
+              </div>
+            </header>
+
+            {message && (
+              <div className="message">
+                <div className="message-body">
+                  <Warning24Regular />
+                  <span>{message}</span>
+                </div>
+                <button onClick={() => setMessage("")}>Dismiss</button>
+              </div>
+            )}
+
+            {section === "setup" && (
+              <SetupSection
+                projectName={projectName}
+                projectParent={projectParent}
+                projects={projects}
+                setProjectName={setProjectName}
+                setProjectParent={setProjectParent}
+                chooseDirectory={chooseDirectory}
+                createNewProject={createNewProject}
+                openExistingProject={openExistingProject}
+                loadProjectData={loadProjectData}
+              />
+            )}
+
+            {section === "files" && (
+              <section className="panel">
+                <div className="toolbar">
+                  <select value={newFileRole} onChange={(event) => setNewFileRole(event.target.value as FileRole)}>
+                    {FILE_ROLES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
+                  </select>
+                  <Button appearance="primary" icon={<Add24Regular />} disabled={!project} onClick={() => void browseAndIngestFiles()}>Add Files</Button>
+                  <Button icon={<CheckmarkCircle24Regular />} disabled={!project} onClick={() => void validateInputs()}>Validate</Button>
+                </div>
+                <FileTable files={files} onRoleChange={updateRole} />
+                <ValidationList issues={validation} />
+              </section>
+            )}
+
+            {section === "profiles" && (
+              <section className="panel">
+                <div className="toolbar">
+                  <label>Review profile</label>
+                  <select value={profile} onChange={(event) => setProfile(event.target.value)}>
+                    {Object.keys(profiles).map((name) => <option key={name} value={name}>{name.replaceAll("_", " ")}</option>)}
+                  </select>
+                </div>
+                <RulesTable rules={rules} />
+              </section>
+            )}
+
+            {section === "run" && (
+              <section className="panel">
+                <div className="run-summary">
+                  <Button appearance="primary" icon={<Play24Regular />} disabled={!project || busy || currentRun?.run.status === "running"} onClick={() => void startRun()}>
+                    Run Review
+                  </Button>
+                  <div>
+                    <strong>{currentRun?.run.status ?? "not started"}</strong>
+                    <span>{currentRun?.run.issue_count ?? 0} finding(s), {currentRun?.run.page_count ?? 0} page(s)</span>
+                  </div>
+                </div>
+                <ProgressBar value={runPercent / 100} />
+                <ol className="progress-list">
+                  {currentRun?.progress.map((event) => (
+                    <li key={event.id} className={event.level === "error" ? "error" : ""}>
+                      <span>{event.step}</span>
+                      <p>{event.message}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {section === "findings" && (
+              <section className="findings-layout">
+                <div className="panel findings-table-panel">
+                  <FindingFilters filters={filters} setFilters={setFilters} disciplines={disciplines} ruleIds={ruleIds} />
+                  <FindingsTable findings={filteredFindings} selectedId={selectedFinding?.id ?? ""} onSelect={setSelectedFindingId} onPatch={patchFinding} />
+                </div>
+                <FindingDetail finding={selectedFinding} onPatch={patchFinding} />
+              </section>
+            )}
+
+            {section === "export" && (
+              <section className="panel">
+                <div className="toolbar">
+                  <label>Finding scope</label>
+                  <select value={packetScope} onChange={(event) => setPacketScope(event.target.value)}>
+                    <option value="accepted_only">accepted only</option>
+                    <option value="accepted_and_needs_review">accepted and needs review</option>
+                    <option value="all_non_rejected">all non-rejected</option>
+                    <option value="all">all findings</option>
+                  </select>
+                  <Button appearance="primary" icon={<DocumentPdf24Regular />} disabled={!currentRun} onClick={() => void exportPacket()}>Export Packet</Button>
+                  <Button disabled={!packetPath || !window.autoreview} onClick={() => void openPacket()}>Open Packet</Button>
+                </div>
+                {packetPath && <div className="output-path">{packetPath}</div>}
+              </section>
+            )}
+
+            {section === "history" && (
+              <section className="panel">
+                <div className="toolbar">
+                  <Button disabled={history.length < 2} onClick={() => void compareLatestRuns()}>Compare Latest Runs</Button>
+                </div>
+                <RunHistory runs={history} onOpen={(run) => void loadRunDetails(run.id)} />
+                {comparison && <ComparisonSummary comparison={comparison} />}
+              </section>
+            )}
+
+            {section === "training" && (
+              <TrainingSection
+                project={project}
+                currentRun={currentRun}
+                selectedFinding={selectedFinding}
+                trainingSets={trainingSets}
+                selectedTrainingSetId={selectedTrainingSetId}
+                regression={regression}
+                missedMessage={missedMessage}
+                setSelectedTrainingSetId={setSelectedTrainingSetId}
+                setMissedMessage={setMissedMessage}
+                createTrainingFromRun={createTrainingFromRun}
+                labelSelectedFalsePositive={labelSelectedFalsePositive}
+                addMissedFromForm={addMissedFromForm}
+                runTrainingRegression={runTrainingRegression}
+              />
+            )}
+
+            {section === "settings" && (
+              <section className="panel settings-grid">
+                <div>
+                  <h3>Local Processing</h3>
+                  <p>Backend: {health}</p>
+                  <p>Project database: {project?.database_path ?? "none"}</p>
+                </div>
+                <div>
+                  <h3>Current Review Profile</h3>
+                  <p>{profile}</p>
+                  <p>{rules.filter((rule) => rule.enabled_by_default).length} default deterministic rules listed.</p>
+                </div>
+              </section>
+            )}
+          </main>
+        </div>
       </div>
     </FluentProvider>
+  );
+}
+
+function SetupSection({
+  projectName,
+  projectParent,
+  projects,
+  setProjectName,
+  setProjectParent,
+  chooseDirectory,
+  createNewProject,
+  openExistingProject,
+  loadProjectData
+}: {
+  projectName: string;
+  projectParent: string;
+  projects: ProjectRecord[];
+  setProjectName: (value: string) => void;
+  setProjectParent: (value: string) => void;
+  chooseDirectory: () => Promise<void>;
+  createNewProject: () => Promise<void>;
+  openExistingProject: () => Promise<void>;
+  loadProjectData: (project: ProjectRecord) => Promise<void>;
+}) {
+  return (
+    <section className="setup-grid">
+      <div className="setup-card project-card">
+        <div className="card-title">
+          <span className="title-accent" />
+          <h3>Create or Open a Project</h3>
+        </div>
+        <div className="setup-form">
+          <label>Project name</label>
+          <Input value={projectName} contentAfter={<Sparkle24Regular className="input-sparkle" />} onChange={(_, data) => setProjectName(data.value)} />
+          <label>Project parent folder</label>
+          <div className="path-row">
+            <Input placeholder="Select a folder or type a path" value={projectParent} onChange={(_, data) => setProjectParent(data.value)} />
+            <Button icon={<FolderOpen24Regular />} onClick={() => void chooseDirectory()}>Browse</Button>
+          </div>
+          <div className="button-row">
+            <Button appearance="primary" icon={<Add24Regular />} onClick={() => void createNewProject()}>Create Project</Button>
+            <Button icon={<FolderOpen24Regular />} onClick={() => void openExistingProject()}>Open Project</Button>
+          </div>
+          <div className="info-callout">
+            <span className="info-icon"><Info24Regular /></span>
+            <div>
+              <p>Projects contain your configuration, rules, and results in one place.</p>
+              <button type="button" className="learn-link">Learn more <ChevronRight24Regular /></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="setup-card recent-card">
+        <div className="recent-header">
+          <h3>Recent Projects</h3>
+          <button type="button">View all <ChevronRight24Regular /></button>
+        </div>
+        {projects.length > 0 ? (
+          <div className="recent-list">
+            {projects.map((item) => (
+              <button key={item.id} onClick={() => void loadProjectData(item)}>
+                <strong>{item.name}</strong>
+                <span>{item.root_path}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="recent-empty">
+            <div className="folder-illustration">
+              <FolderOpen24Regular />
+              <Sparkle24Regular className="sparkle sparkle-one" />
+              <Sparkle24Regular className="sparkle sparkle-two" />
+            </div>
+            <h3>No recent projects</h3>
+            <p>Your recently opened projects will appear here for quick access.</p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -778,6 +853,83 @@ function RunHistory({ runs, onOpen }: { runs: RunRecord[]; onOpen: (run: RunReco
         ))}
       </tbody>
     </table>
+  );
+}
+
+function TrainingSection({
+  project,
+  currentRun,
+  selectedFinding,
+  trainingSets,
+  selectedTrainingSetId,
+  regression,
+  missedMessage,
+  setSelectedTrainingSetId,
+  setMissedMessage,
+  createTrainingFromRun,
+  labelSelectedFalsePositive,
+  addMissedFromForm,
+  runTrainingRegression
+}: {
+  project: ProjectRecord | null;
+  currentRun: RunWithProgress | null;
+  selectedFinding: FindingRecord | null;
+  trainingSets: TrainingSetRecord[];
+  selectedTrainingSetId: string;
+  regression: RegressionResult | null;
+  missedMessage: string;
+  setSelectedTrainingSetId: (value: string) => void;
+  setMissedMessage: (value: string) => void;
+  createTrainingFromRun: () => Promise<void>;
+  labelSelectedFalsePositive: () => Promise<void>;
+  addMissedFromForm: () => Promise<void>;
+  runTrainingRegression: () => Promise<void>;
+}) {
+  return (
+    <section className="panel training-panel">
+      <div className="toolbar">
+        <Button disabled={!project || !currentRun} onClick={() => void createTrainingFromRun()}>Create Training Set</Button>
+        <select value={selectedTrainingSetId} onChange={(event) => setSelectedTrainingSetId(event.target.value)}>
+          <option value="">training set</option>
+          {trainingSets.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <Button disabled={!selectedTrainingSetId || !selectedFinding} onClick={() => void labelSelectedFalsePositive()}>Mark False Positive</Button>
+        <Button disabled={!selectedTrainingSetId} onClick={() => void runTrainingRegression()}>Run Regression</Button>
+      </div>
+      <div className="training-grid">
+        <div>
+          <h3>Training Sets</h3>
+          <table className="data-table">
+            <thead><tr><th>Name</th><th>Source Run</th><th>Golden</th></tr></thead>
+            <tbody>
+              {trainingSets.map((item) => (
+                <tr key={item.id} onClick={() => setSelectedTrainingSetId(item.id)}>
+                  <td><strong>{item.name}</strong><span>{item.id}</span></td>
+                  <td className="mono">{item.source_run_id ?? ""}</td>
+                  <td>{item.golden_path ? "yes" : "no"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Missed Finding</h3>
+          <Textarea value={missedMessage} resize="vertical" onChange={(_, data) => setMissedMessage(data.value)} />
+          <Button disabled={!selectedTrainingSetId || !missedMessage.trim()} onClick={() => void addMissedFromForm()}>Add Missed Finding</Button>
+          {regression && (
+            <div className="regression-result">
+              <div><strong>{regression.expected_count}</strong><span>expected</span></div>
+              <div><strong>{regression.actual_count}</strong><span>actual</span></div>
+              <div><strong>{regression.missing_fingerprints.length}</strong><span>missing</span></div>
+              <div><strong>{regression.new_fingerprints.length}</strong><span>new</span></div>
+              <div><strong>{regression.changed.length}</strong><span>changed</span></div>
+              <div><strong>{regression.false_positive_count}</strong><span>false positive</span></div>
+              <div><strong>{regression.missed_finding_count}</strong><span>missed</span></div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
