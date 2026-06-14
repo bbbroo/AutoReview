@@ -125,12 +125,23 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     second_run = client.post(f"/projects/{project['id']}/runs", json={"profile": "balanced"})
     assert second_run.status_code == 200
     second_run_id = second_run.json()["id"]
+    second_findings = client.get(f"/runs/{second_run_id}/findings").json()
+    matching_second = next(item for item in second_findings if item["fingerprint"] == findings[0]["fingerprint"])
+    second_patch = client.patch(
+        f"/findings/{matching_second['id']}",
+        json={"severity": "Critical", "edited_message": "Changed comparison wording."},
+    )
+    assert second_patch.status_code == 200
     comparison = client.get(f"/runs/{run_id}/compare/{second_run_id}")
     assert comparison.status_code == 200
     comparison_body = comparison.json()
     assert comparison_body["repeated_issue_ids"]
     assert not comparison_body["new_issue_ids"]
     assert not comparison_body["resolved_issue_ids"]
+    assert matching_second["issue_id"] in comparison_body["status_changed_issue_ids"]
+    assert matching_second["issue_id"] in comparison_body["severity_changed_issue_ids"]
+    assert matching_second["issue_id"] in comparison_body["message_changed_issue_ids"]
+    assert comparison_body["carryover_issue_ids"]
 
     exported = client.get(f"/projects/{project['id']}/profiles/export/balanced")
     assert exported.status_code == 200
@@ -156,7 +167,10 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     assert label.status_code == 200
     assert missed.status_code == 200
     assert regression.status_code == 200
-    assert regression.json()["actual_count"] == len(findings)
+    regression_body = regression.json()
+    assert regression_body["actual_count"] == len(findings)
+    assert regression_body["rule_performance"]
+    assert any(row["false_positive_count"] >= 1 for row in regression_body["rule_performance"])
 
 
 def test_backend_api_open_project_returns_friendly_error(tmp_path: Path, monkeypatch):

@@ -1098,15 +1098,39 @@ function TrainingSection({
           <Textarea value={missedMessage} resize="vertical" onChange={(_, data) => setMissedMessage(data.value)} />
           <Button disabled={!selectedTrainingSetId || !missedMessage.trim()} onClick={() => void addMissedFromForm()}>Add Missed Finding</Button>
           {regression && (
-            <div className="regression-result">
-              <div><strong>{regression.expected_count}</strong><span>expected</span></div>
-              <div><strong>{regression.actual_count}</strong><span>actual</span></div>
-              <div><strong>{regression.missing_fingerprints.length}</strong><span>missing</span></div>
-              <div><strong>{regression.new_fingerprints.length}</strong><span>new</span></div>
-              <div><strong>{regression.changed.length}</strong><span>changed</span></div>
-              <div><strong>{regression.false_positive_count}</strong><span>false positive</span></div>
-              <div><strong>{regression.missed_finding_count}</strong><span>missed</span></div>
-            </div>
+            <>
+              <div className="regression-result">
+                <div><strong>{regression.expected_count}</strong><span>expected</span></div>
+                <div><strong>{regression.actual_count}</strong><span>actual</span></div>
+                <div><strong>{regression.missing_fingerprints.length}</strong><span>missing</span></div>
+                <div><strong>{regression.new_fingerprints.length}</strong><span>new</span></div>
+                <div><strong>{regression.changed.length}</strong><span>changed</span></div>
+                <div><strong>{regression.false_positive_count}</strong><span>false positive</span></div>
+                <div><strong>{regression.missed_finding_count}</strong><span>missed</span></div>
+              </div>
+              {!!regression.rule_performance.length && (
+                <table className="data-table compact-table">
+                  <thead>
+                    <tr><th>Rule</th><th>Expected</th><th>Actual</th><th>Matched</th><th>Missing</th><th>New</th><th>Changed</th><th>FP</th><th>Missed</th></tr>
+                  </thead>
+                  <tbody>
+                    {regression.rule_performance.map((rule) => (
+                      <tr key={rule.rule_id}>
+                        <td className="mono">{rule.rule_id}</td>
+                        <td>{rule.expected_count}</td>
+                        <td>{rule.actual_count}</td>
+                        <td>{rule.matched_count}</td>
+                        <td>{rule.missing_count}</td>
+                        <td>{rule.new_count}</td>
+                        <td>{rule.changed_count}</td>
+                        <td>{rule.false_positive_count}</td>
+                        <td>{rule.missed_finding_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1120,6 +1144,10 @@ function ComparisonSummary({ comparison }: { comparison: RunComparisonSummary })
       <div><strong>{comparison.new_issue_ids.length}</strong><span>new</span></div>
       <div><strong>{comparison.resolved_issue_ids.length}</strong><span>resolved</span></div>
       <div><strong>{comparison.repeated_issue_ids.length}</strong><span>repeated</span></div>
+      <div><strong>{comparison.carryover_issue_ids.length}</strong><span>carryover</span></div>
+      <div><strong>{comparison.status_changed_issue_ids.length}</strong><span>status changed</span></div>
+      <div><strong>{comparison.severity_changed_issue_ids.length}</strong><span>severity changed</span></div>
+      <div><strong>{comparison.message_changed_issue_ids.length}</strong><span>message changed</span></div>
       <div><strong>{comparison.changed.length}</strong><span>changed</span></div>
     </div>
   );

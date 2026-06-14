@@ -94,7 +94,8 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 1. Run the same sample project twice.
 2. Open Run History.
 3. Compare latest runs.
-4. Confirm repeated findings are listed and issue IDs remain stable for matching fingerprints.
+4. Confirm new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and changed counts render.
+5. Confirm issue IDs remain stable for matching fingerprints.
 
 ## Training
 
@@ -103,6 +104,7 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 3. Add a missed finding.
 4. Run regression.
 5. Confirm expected, actual, missing, new, changed, false-positive, and missed counts render.
+6. Confirm the per-rule performance table lists expected, actual, matched, missing, new, changed, false-positive, and missed counts.
 
 ## Settings
 

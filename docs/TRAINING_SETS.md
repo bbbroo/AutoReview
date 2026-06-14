@@ -10,6 +10,16 @@ Training sets are local deterministic regression assets, not black-box AI traini
 4. Add manual missed findings when the engine missed an expected issue.
 5. Run golden comparison after rule/config/code changes.
 
+## Regression Output
+
+Golden comparison reports:
+
+- expected, actual, missing, new, and changed finding counts
+- false-positive and missed-finding label counts
+- per-rule performance rows with expected, actual, matched, missing, new, changed, false-positive, wording, tuning, and missed counts
+
+The rule summary is intended for practical rule tuning. It is not an AI training score and does not prove engineering correctness.
+
 ## Stored Data
 
 Training data lives under the project folder:

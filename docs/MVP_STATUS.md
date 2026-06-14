@@ -35,7 +35,8 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Packet PDFs include bookmarks for major sections and drawing-page finding clusters.
 - Issue IDs in the packet front matter link to the related marked-up drawing page when the PDF viewer supports internal links.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
-- Run history, run comparison, training labels, missed findings, and golden regression foundation.
+- Run history and comparison show new, resolved, repeated, carryover, status-changed, severity-changed, and message-changed findings.
+- Training labels, missed findings, golden regression, and per-rule regression performance summaries.
 - Support exports including CSV, XLSX, Markdown, HTML, logs, and diagnostics.
 
 ## Verification Results
@@ -48,7 +49,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
 
 Sample project smoke:
 
@@ -122,6 +123,6 @@ local_test_inputs/
 
 1. Add automated UI/e2e tests around project setup, file selection, run status, findings edits, filters, and packet export.
 2. Add company-specific profile tuning from labeled real examples.
-3. Broaden golden regression sets with synthetic regulator station, P&ID, and drawing-index mismatch cases.
+3. Broaden golden regression sets with synthetic regulator station, P&ID, and drawing-index mismatch cases, then use per-rule summaries to tune noisy rules.
 4. Improve finding evidence display and rule explanation panels in the UI.
 5. Plan Electron/Vite/Vitest/Electron major dependency upgrades in a controlled compatibility branch.

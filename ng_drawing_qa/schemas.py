@@ -324,6 +324,21 @@ class RunComparison(BaseModel):
     changed_findings: list[dict[str, Any]]
 
 
+class RulePerformanceSummary(BaseModel):
+    rule_id: str
+    expected_count: int = 0
+    actual_count: int = 0
+    matched_count: int = 0
+    missing_count: int = 0
+    new_count: int = 0
+    changed_count: int = 0
+    correct_count: int = 0
+    false_positive_count: int = 0
+    needs_better_wording_count: int = 0
+    rule_needs_tuning_count: int = 0
+    missed_finding_count: int = 0
+
+
 class TrainingLabel(str, Enum):
     CORRECT = "correct"
     FALSE_POSITIVE = "false_positive"
@@ -396,3 +411,4 @@ class RegressionResult(BaseModel):
     changed: list[dict[str, Any]] = Field(default_factory=list)
     false_positive_count: int = 0
     missed_finding_count: int = 0
+    rule_performance: list[RulePerformanceSummary] = Field(default_factory=list)

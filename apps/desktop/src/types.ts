@@ -216,6 +216,10 @@ export interface RunComparisonSummary {
   new_issue_ids: string[];
   resolved_issue_ids: string[];
   repeated_issue_ids: string[];
+  carryover_issue_ids: string[];
+  status_changed_issue_ids: string[];
+  severity_changed_issue_ids: string[];
+  message_changed_issue_ids: string[];
   changed: Array<Record<string, unknown>>;
 }
 
@@ -250,6 +254,20 @@ export interface RegressionResult {
   changed: Array<Record<string, unknown>>;
   false_positive_count: number;
   missed_finding_count: number;
+  rule_performance: Array<{
+    rule_id: string;
+    expected_count: number;
+    actual_count: number;
+    matched_count: number;
+    missing_count: number;
+    new_count: number;
+    changed_count: number;
+    correct_count: number;
+    false_positive_count: number;
+    needs_better_wording_count: number;
+    rule_needs_tuning_count: number;
+    missed_finding_count: number;
+  }>;
 }
 
 export const FILE_ROLES: FileRole[] = [

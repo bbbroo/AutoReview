@@ -8,6 +8,8 @@ from ..schemas import (
     MissedFindingCreate,
     MissedFindingRecord,
     RegressionResult,
+    RulePerformanceSummary,
+    TrainingLabel,
     TrainingLabelRecord,
     TrainingLabelRequest,
     TrainingSetCreate,
@@ -98,6 +100,85 @@ def add_missed_finding(project_db_path: Path, training_set_id: str, request: Mis
     return repo.add_missed_finding(record)
 
 
+def _rule_for_fingerprint(
+    fingerprint: str,
+    expected: dict[str, dict],
+    actual: dict,
+    labels: list[TrainingLabelRecord],
+) -> str:
+    if fingerprint in actual:
+        return str(actual[fingerprint].rule_id)
+    if fingerprint in expected:
+        return str(expected[fingerprint].get("rule_id") or "UNKNOWN_RULE")
+    for label in labels:
+        if label.fingerprint == fingerprint and label.finding_id:
+            return "UNKNOWN_RULE"
+    return "UNKNOWN_RULE"
+
+
+def _rule_performance_summary(
+    expected: dict[str, dict],
+    actual: dict,
+    missing: list[str],
+    new: list[str],
+    changed: list[dict],
+    labels: list[TrainingLabelRecord],
+    missed_findings: list[MissedFindingRecord],
+) -> list[RulePerformanceSummary]:
+    by_rule: dict[str, dict[str, int]] = {}
+
+    def bucket(rule_id: str) -> dict[str, int]:
+        if rule_id not in by_rule:
+            by_rule[rule_id] = {
+                "expected_count": 0,
+                "actual_count": 0,
+                "matched_count": 0,
+                "missing_count": 0,
+                "new_count": 0,
+                "changed_count": 0,
+                "correct_count": 0,
+                "false_positive_count": 0,
+                "needs_better_wording_count": 0,
+                "rule_needs_tuning_count": 0,
+                "missed_finding_count": 0,
+            }
+        return by_rule[rule_id]
+
+    for row in expected.values():
+        bucket(str(row.get("rule_id") or "UNKNOWN_RULE"))["expected_count"] += 1
+    for finding in actual.values():
+        bucket(str(finding.rule_id))["actual_count"] += 1
+    for fingerprint in sorted(set(expected) & set(actual)):
+        bucket(_rule_for_fingerprint(fingerprint, expected, actual, labels))["matched_count"] += 1
+    for fingerprint in missing:
+        bucket(_rule_for_fingerprint(fingerprint, expected, actual, labels))["missing_count"] += 1
+    for fingerprint in new:
+        bucket(_rule_for_fingerprint(fingerprint, expected, actual, labels))["new_count"] += 1
+    for item in changed:
+        bucket(_rule_for_fingerprint(str(item.get("fingerprint", "")), expected, actual, labels))["changed_count"] += 1
+
+    for label in labels:
+        rule_id = _rule_for_fingerprint(label.fingerprint, expected, actual, labels)
+        if label.label == TrainingLabel.CORRECT:
+            bucket(rule_id)["correct_count"] += 1
+        elif label.label == TrainingLabel.FALSE_POSITIVE:
+            bucket(rule_id)["false_positive_count"] += 1
+        elif label.label == TrainingLabel.NEEDS_BETTER_WORDING:
+            bucket(rule_id)["needs_better_wording_count"] += 1
+        elif label.label == TrainingLabel.RULE_NEEDS_TUNING:
+            bucket(rule_id)["rule_needs_tuning_count"] += 1
+        elif label.label == TrainingLabel.MISSED_ISSUE:
+            bucket(rule_id)["missed_finding_count"] += 1
+
+    for missed in missed_findings:
+        bucket(missed.rule_id)["missed_finding_count"] += 1
+
+    return [
+        RulePerformanceSummary(rule_id=rule_id, **counts)
+        for rule_id, counts in sorted(by_rule.items(), key=lambda item: item[0])
+    ]
+
+
 def compare_against_golden(project_db_path: Path, training_set_id: str, run_id: str | None = None) -> RegressionResult:
     repo = ProjectRepository(project_db_path)
     training_set = repo.get_training_set(training_set_id)
@@ -133,6 +214,7 @@ def compare_against_golden(project_db_path: Path, training_set_id: str, run_id: 
     labels = repo.list_training_labels(training_set_id)
     missed = repo.list_missed_findings(training_set_id)
     false_positive_count = sum(1 for label in labels if label.label.value == "false_positive")
+    rule_performance = _rule_performance_summary(expected, actual, missing, new, changed, labels, missed)
     return RegressionResult(
         training_set_id=training_set_id,
         source_run_id=source_run_id,
@@ -143,4 +225,5 @@ def compare_against_golden(project_db_path: Path, training_set_id: str, run_id: 
         changed=changed,
         false_positive_count=false_positive_count,
         missed_finding_count=len(missed),
+        rule_performance=rule_performance,
     )

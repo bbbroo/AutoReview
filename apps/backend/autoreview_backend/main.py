@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ng_drawing_qa.config import load_config
 from ng_drawing_qa.errors import AutoReviewError, ReviewRunError
@@ -69,6 +69,10 @@ class RunComparisonSummary(BaseModel):
     new_issue_ids: list[str]
     resolved_issue_ids: list[str]
     repeated_issue_ids: list[str]
+    carryover_issue_ids: list[str] = Field(default_factory=list)
+    status_changed_issue_ids: list[str] = Field(default_factory=list)
+    severity_changed_issue_ids: list[str] = Field(default_factory=list)
+    message_changed_issue_ids: list[str] = Field(default_factory=list)
     changed: list[dict[str, Any]]
 
 
@@ -335,22 +339,44 @@ def compare_runs(base_run_id: str, compare_run_id: str) -> RunComparisonSummary:
     new = [f.issue_id for key, f in compare_findings.items() if key not in base_findings]
     resolved = [f.issue_id for key, f in base_findings.items() if key not in compare_findings]
     repeated = [compare_findings[key].issue_id for key in sorted(set(base_findings) & set(compare_findings))]
+    carryover: list[str] = []
+    status_changed: list[str] = []
+    severity_changed: list[str] = []
+    message_changed: list[str] = []
     changed: list[dict[str, Any]] = []
     for key in sorted(set(base_findings) & set(compare_findings)):
         before = base_findings[key]
         after = compare_findings[key]
         diffs = {}
         for field in ["severity", "edited_message", "status", "confidence"]:
-            if getattr(before, field) != getattr(after, field):
-                diffs[field] = {"before": getattr(before, field), "after": getattr(after, field)}
+            before_value = getattr(before, field)
+            after_value = getattr(after, field)
+            if hasattr(before_value, "value"):
+                before_value = before_value.value
+            if hasattr(after_value, "value"):
+                after_value = after_value.value
+            if before_value != after_value:
+                diffs[field] = {"before": before_value, "after": after_value}
         if diffs:
             changed.append({"issue_id": after.issue_id, "fingerprint": key, "changes": diffs})
+            if "status" in diffs:
+                status_changed.append(after.issue_id)
+            if "severity" in diffs:
+                severity_changed.append(after.issue_id)
+            if "edited_message" in diffs:
+                message_changed.append(after.issue_id)
+        else:
+            carryover.append(after.issue_id)
     return RunComparisonSummary(
         base_run_id=base_run_id,
         compare_run_id=compare_run_id,
         new_issue_ids=new,
         resolved_issue_ids=resolved,
         repeated_issue_ids=repeated,
+        carryover_issue_ids=carryover,
+        status_changed_issue_ids=status_changed,
+        severity_changed_issue_ids=severity_changed,
+        message_changed_issue_ids=message_changed,
         changed=changed,
     )
 

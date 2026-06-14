@@ -276,6 +276,12 @@ def test_training_set_labels_and_golden_regression(tmp_path: Path):
     assert result.actual_count == len(findings)
     assert result.false_positive_count == 1
     assert result.missed_finding_count == 1
+    rules = {row.rule_id: row for row in result.rule_performance}
+    assert findings[0].rule_id in rules
+    assert rules[findings[0].rule_id].false_positive_count == 1
+    assert rules["VALVE_TAG_RECONCILIATION"].missed_finding_count >= 1
+    assert sum(row.expected_count for row in result.rule_performance) == len(findings)
+    assert sum(row.actual_count for row in result.rule_performance) == len(findings)
 
 
 def test_profile_export_import(tmp_path: Path):
