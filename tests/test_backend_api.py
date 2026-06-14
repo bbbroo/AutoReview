@@ -83,6 +83,12 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     rejected = client.patch(f"/findings/{findings[1]['id']}", json={"status": "Rejected"})
     assert accepted.status_code == 200
     assert rejected.status_code == 200
+    accepted_body = accepted.json()
+    history_fields = {item["field_name"] for item in accepted_body["decision_history"]}
+    assert {"status", "edited_message"} <= history_fields
+    history = client.get(f"/findings/{findings[0]['id']}/history")
+    assert history.status_code == 200
+    assert {item["field_name"] for item in history.json()} == history_fields
 
     packet = client.post(f"/runs/{run_id}/export-packet", json={"finding_scope": "accepted_only", "packet_name": "api_packet.pdf"})
     assert packet.status_code == 200, packet.text

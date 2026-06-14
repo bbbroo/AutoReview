@@ -111,6 +111,20 @@ export interface FindingEvidence {
   rule_metadata: Record<string, unknown>;
 }
 
+export interface FindingDecisionRecord {
+  id: string;
+  project_id: string;
+  run_id: string;
+  finding_id: string;
+  issue_id: string;
+  created_at: string;
+  field_name: string;
+  previous_value: string;
+  new_value: string;
+  reviewer: string;
+  note: string;
+}
+
 export interface FindingRecord {
   id: string;
   project_id: string;
@@ -139,6 +153,7 @@ export interface FindingRecord {
   rfi_candidate: boolean;
   source: string;
   evidence: FindingEvidence;
+  decision_history: FindingDecisionRecord[];
   created_at: string;
   updated_at: string;
 }

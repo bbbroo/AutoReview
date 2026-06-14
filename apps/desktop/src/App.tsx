@@ -786,6 +786,18 @@ function FindingsTable({
   );
 }
 
+function metadataText(metadata: Record<string, unknown>, key: string, fallback = "not provided") {
+  const value = metadata[key];
+  if (Array.isArray(value)) return value.length ? value.join(", ") : fallback;
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
+}
+
+function coordinateText(finding: FindingRecord) {
+  if (![finding.x0, finding.y0, finding.x1, finding.y1].some((value) => value !== 0)) return "not available";
+  return `${finding.x0.toFixed(1)}, ${finding.y0.toFixed(1)}, ${finding.x1.toFixed(1)}, ${finding.y1.toFixed(1)}`;
+}
+
 function FindingDetail({
   finding,
   onPatch
@@ -802,6 +814,7 @@ function FindingDetail({
   }, [finding?.id]);
 
   if (!finding) return <aside className="panel detail-panel empty-state">No finding selected.</aside>;
+  const ruleMetadata = finding.evidence.rule_metadata ?? {};
 
   return (
     <aside className="panel detail-panel">
@@ -835,16 +848,59 @@ function FindingDetail({
       <Textarea value={notes} resize="vertical" onChange={(_, data) => setNotes(data.value)} />
       <Button appearance="primary" icon={<Save24Regular />} onClick={() => void onPatch(finding, { edited_message: message, reviewer_notes: notes })}>Save Finding</Button>
 
+      <div className="trust-note">
+        Deterministic draft finding. Review evidence and edit, accept, reject, or classify before packet export.
+      </div>
+
       <div className="evidence">
-        <h4>Evidence</h4>
+        <h4>Rule Explanation</h4>
         <dl>
+          <dt>Rule ID</dt><dd className="mono">{finding.rule_id}</dd>
+          <dt>Rule name</dt><dd>{metadataText(ruleMetadata, "name", finding.subject)}</dd>
+          <dt>Description</dt><dd>{metadataText(ruleMetadata, "description", "No rule description available.")}</dd>
+          <dt>Discipline</dt><dd>{metadataText(ruleMetadata, "discipline", finding.discipline)}</dd>
+          <dt>Default severity</dt><dd>{metadataText(ruleMetadata, "default_severity", finding.severity)}</dd>
+          <dt>Default confidence</dt><dd>{metadataText(ruleMetadata, "default_confidence", `${Math.round(finding.confidence * 100)}%`)}</dd>
+          <dt>Required inputs</dt><dd>{metadataText(ruleMetadata, "required_inputs", "drawing text")}</dd>
+          <dt>Profiles</dt><dd>{metadataText(ruleMetadata, "profiles", "profile controlled")}</dd>
+          <dt>False-positive notes</dt><dd>{metadataText(ruleMetadata, "false_positive_notes", "No false-positive notes documented for this rule.")}</dd>
+        </dl>
+      </div>
+
+      <div className="evidence">
+        <h4>Finding Evidence</h4>
+        <dl>
+          <dt>Why flagged</dt><dd>{finding.evidence.reason || finding.original_message}</dd>
           <dt>Original</dt><dd>{finding.original_message}</dd>
+          <dt>Edited</dt><dd>{finding.edited_message}</dd>
           <dt>Matched text</dt><dd>{finding.found_text || "none"}</dd>
           <dt>Context</dt><dd>{finding.context || finding.evidence.context || "none"}</dd>
           <dt>Sheet/Page</dt><dd>{finding.sheet_number} / {finding.page_number}</dd>
-          <dt>Coordinates</dt><dd>{finding.x0}, {finding.y0}, {finding.x1}, {finding.y1}</dd>
+          <dt>Output PDF page</dt><dd>{finding.output_pdf_page_number}</dd>
+          <dt>Coordinates</dt><dd>{coordinateText(finding)}</dd>
+          <dt>Confidence</dt><dd>{Math.round(finding.confidence * 100)}%</dd>
           <dt>Fingerprint</dt><dd className="mono">{finding.fingerprint}</dd>
+          <dt>Reference source</dt><dd>{finding.evidence.source_file || "not linked"}</dd>
+          <dt>Reference role</dt><dd>{finding.evidence.source_role || "not linked"}</dd>
+          <dt>Reference row</dt><dd>{finding.evidence.source_row_number ?? "not linked"}</dd>
         </dl>
+      </div>
+
+      <div className="evidence">
+        <h4>Decision History</h4>
+        {finding.decision_history.length ? (
+          <ol className="decision-history">
+            {finding.decision_history.map((decision) => (
+              <li key={decision.id}>
+                <strong>{decision.field_name}</strong>
+                <span>{decision.previous_value || "blank"}{" -> "}{decision.new_value || "blank"}</span>
+                <small>{decision.created_at} by {decision.reviewer}</small>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="muted">No reviewer decisions recorded yet.</p>
+        )}
       </div>
     </aside>
   );

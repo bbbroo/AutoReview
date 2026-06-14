@@ -1,6 +1,7 @@
 import type {
   FileRecord,
   FileRole,
+  FindingDecisionRecord,
   FindingRecord,
   FindingStatus,
   PacketExportRecord,
@@ -62,6 +63,7 @@ export const api = {
     request<RunRecord>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify({ profile }) }),
   run: (runId: string) => request<RunWithProgress>(`/runs/${runId}`),
   findings: (runId: string) => request<FindingRecord[]>(`/runs/${runId}/findings`),
+  findingHistory: (findingId: string) => request<FindingDecisionRecord[]>(`/findings/${findingId}/history`),
   patchFinding: (
     findingId: string,
     patch: Partial<{

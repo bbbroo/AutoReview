@@ -176,6 +176,20 @@ class FindingEvidence(BaseModel):
     rule_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class FindingDecisionRecord(BaseModel):
+    id: str
+    project_id: str
+    run_id: str
+    finding_id: str
+    issue_id: str
+    created_at: str
+    field_name: str
+    previous_value: str
+    new_value: str
+    reviewer: str = "local_user"
+    note: str = ""
+
+
 class FindingRecord(BaseModel):
     id: str
     project_id: str
@@ -204,6 +218,7 @@ class FindingRecord(BaseModel):
     rfi_candidate: bool = False
     source: str = "auto"
     evidence: FindingEvidence
+    decision_history: list[FindingDecisionRecord] = Field(default_factory=list)
     created_at: str
     updated_at: str
 

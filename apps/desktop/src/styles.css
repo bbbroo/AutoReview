@@ -849,6 +849,16 @@ select {
   gap: 6px;
 }
 
+.trust-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #bdd7ff;
+  border-radius: 8px;
+  color: #17406f;
+  background: #eef6ff;
+  line-height: 1.45;
+}
+
 .evidence {
   margin-top: 12px;
   border-top: 1px solid #e6edf7;
@@ -870,6 +880,34 @@ select {
 .evidence dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.decision-history {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decision-history li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid #dfe7f2;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.decision-history strong,
+.decision-history span,
+.decision-history small {
+  overflow-wrap: anywhere;
+}
+
+.decision-history small,
+.muted {
+  color: #667085;
 }
 
 .severity,

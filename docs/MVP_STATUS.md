@@ -25,6 +25,8 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Review runs through an isolated Python worker.
 - Finding persistence with stable `AR-####` issue IDs and deterministic fingerprints.
 - Reviewer updates for status, severity, discipline, edited message, RFI flag, and notes.
+- Reviewer decision history is persisted for changed finding fields and exposed through the findings API/UI.
+- Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, and decision history.
 - Packet export after reviewer decisions.
 - Default packet scope excludes rejected findings and includes accepted edited comments.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
@@ -41,7 +43,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, packet export, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, reviewer decision history, packet export, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI test covers the finding trust panel sections for a selected finding.
 
 Sample project smoke:
 
@@ -67,6 +69,7 @@ Private real-PDF smoke:
 ## Current Gaps
 
 - The desktop UI does not yet have automated visual regression coverage.
+- Decision history is local single-user only; there is no reviewer identity/permissions model by design.
 - DOCX support is text extraction only, not print-fidelity rendering.
 - Reference PDFs are preserved/rendered, but structured reconciliation still depends on CSV/XLSX columns.
 - Title block extraction uses numeric configured regions and needs per-company tuning.

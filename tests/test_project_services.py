@@ -76,6 +76,11 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     repo.patch_finding(findings[0].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
     repo.patch_finding(findings[1].id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
     repo.patch_finding(findings[2].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Second accepted reviewer wording."))
+    reviewed = repo.get_finding(findings[0].id)
+    assert reviewed is not None
+    assert {decision.field_name for decision in reviewed.decision_history} >= {"status", "edited_message"}
+    assert any(decision.previous_value == "Draft" and decision.new_value == "Accepted" for decision in reviewed.decision_history)
+    assert reviewed.decision_history[0].issue_id == findings[0].issue_id
     packet = export_review_packet(
         project.database_path,
         run.id,
@@ -102,6 +107,36 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert manifest["output_packet_path"] == str(packet.packet_path)
     assert manifest["finding_status_counts"]["Accepted"] == 2
     assert manifest["finding_status_counts"]["Rejected"] == 1
+
+
+def test_reviewer_decision_history_tracks_finding_edits(tmp_path: Path):
+    project, repo = _seed_sample_project(tmp_path)
+    run = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "decision-history")
+    run_project_review(project.database_path, project.id, run.id, "balanced")
+    finding = repo.list_findings(run.id)[0]
+
+    updated = repo.patch_finding(
+        finding.id,
+        FindingPatch(
+            status=FindingStatus.NEEDS_REVIEW,
+            severity="Critical",
+            discipline="QA Verification",
+            edited_message="Decision history wording.",
+            reviewer_notes="Needs senior reviewer.",
+            rfi_candidate=True,
+        ),
+    )
+
+    fields = {decision.field_name: decision for decision in updated.decision_history}
+    assert fields["status"].previous_value == "Draft"
+    assert fields["status"].new_value == "Needs Review"
+    assert fields["severity"].new_value == "Critical"
+    assert fields["discipline"].new_value == "QA Verification"
+    assert fields["edited_message"].new_value == "Decision history wording."
+    assert fields["reviewer_notes"].new_value == "Needs senior reviewer."
+    assert fields["rfi_candidate"].previous_value == "false"
+    assert fields["rfi_candidate"].new_value == "true"
+    assert all(decision.reviewer == "local_user" for decision in updated.decision_history)
 
 
 def test_fingerprints_and_issue_ids_are_stable_across_repeated_runs(tmp_path: Path):

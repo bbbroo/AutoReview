@@ -34,6 +34,8 @@ This keeps rule execution, finding creation, issue IDs, fingerprints, run manife
 
 Each persisted run writes `run_manifest.json` under `outputs/runs/{run_id}`. The manifest includes project/run identity, profile, app/engine versions, input file paths and hashes, active rule counts, issue and severity counts, reviewer status counts after packet export, output files, packet path, warnings, and failure messages when available.
 
+Finding reviewer changes are stored in SQLite `finding_decisions`. Each changed field records the finding ID, issue ID, run/project IDs, previous value, new value, timestamp, and local reviewer marker. The MVP is local single-user, so the reviewer marker is `local_user` until a future team workflow adds identity.
+
 ## Project Folder
 
 ```text

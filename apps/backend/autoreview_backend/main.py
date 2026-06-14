@@ -15,6 +15,7 @@ from ng_drawing_qa.errors import AutoReviewError, ReviewRunError
 from ng_drawing_qa.rules.registry import get_rule_metadata
 from ng_drawing_qa.schemas import (
     FileIngestRequest,
+    FindingDecisionRecord,
     FileRecord,
     FileRole,
     FindingPatch,
@@ -282,6 +283,12 @@ def get_findings(run_id: str) -> list[FindingRecord]:
 def patch_finding(finding_id: str, patch: FindingPatch) -> FindingRecord:
     _, repo, _ = _find_finding(finding_id)
     return repo.patch_finding(finding_id, patch)
+
+
+@app.get("/findings/{finding_id}/history", response_model=list[FindingDecisionRecord])
+def finding_history(finding_id: str) -> list[FindingDecisionRecord]:
+    _, repo, _ = _find_finding(finding_id)
+    return repo.list_finding_decisions(finding_id)
 
 
 @app.post("/runs/{run_id}/export-packet", response_model=PacketExportRecord)

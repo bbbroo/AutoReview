@@ -10,6 +10,7 @@ from typing import Any
 
 from ..schemas import (
     FileRecord,
+    FindingDecisionRecord,
     FileRole,
     FindingEvidence,
     FindingPatch,
@@ -129,6 +130,20 @@ CREATE TABLE IF NOT EXISTS findings (
 );
 CREATE INDEX IF NOT EXISTS idx_findings_run ON findings(run_id);
 CREATE INDEX IF NOT EXISTS idx_findings_fingerprint ON findings(project_id, fingerprint);
+CREATE TABLE IF NOT EXISTS finding_decisions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    finding_id TEXT NOT NULL,
+    issue_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    field_name TEXT NOT NULL,
+    previous_value TEXT NOT NULL,
+    new_value TEXT NOT NULL,
+    reviewer TEXT NOT NULL,
+    note TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_finding_decisions_finding ON finding_decisions(finding_id, created_at);
 CREATE TABLE IF NOT EXISTS packet_exports (
     id TEXT PRIMARY KEY,
     run_id TEXT NOT NULL,
@@ -199,6 +214,24 @@ class SQLiteStore:
             columns = {row[1] for row in conn.execute("PRAGMA table_info(training_sets)").fetchall()}
             if "golden_path" not in columns:
                 conn.execute("ALTER TABLE training_sets ADD COLUMN golden_path TEXT")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS finding_decisions (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    run_id TEXT NOT NULL,
+                    finding_id TEXT NOT NULL,
+                    issue_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    field_name TEXT NOT NULL,
+                    previous_value TEXT NOT NULL,
+                    new_value TEXT NOT NULL,
+                    reviewer TEXT NOT NULL,
+                    note TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_finding_decisions_finding ON finding_decisions(finding_id, created_at)")
 
 
 class AppIndex:
@@ -495,12 +528,23 @@ class ProjectRepository(SQLiteStore):
     def list_findings(self, run_id: str) -> list[FindingRecord]:
         with self.connect() as conn:
             rows = conn.execute("SELECT * FROM findings WHERE run_id = ? ORDER BY issue_id", (run_id,)).fetchall()
-        return [_finding_from_row(row) for row in rows]
+        return [self._with_decision_history(_finding_from_row(row)) for row in rows]
 
     def get_finding(self, finding_id: str) -> FindingRecord | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM findings WHERE id = ?", (finding_id,)).fetchone()
-        return _finding_from_row(row) if row else None
+        return self._with_decision_history(_finding_from_row(row)) if row else None
+
+    def _with_decision_history(self, finding: FindingRecord) -> FindingRecord:
+        return finding.model_copy(update={"decision_history": self.list_finding_decisions(finding.id)})
+
+    def list_finding_decisions(self, finding_id: str) -> list[FindingDecisionRecord]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM finding_decisions WHERE finding_id = ? ORDER BY created_at, id",
+                (finding_id,),
+            ).fetchall()
+        return [_finding_decision_from_row(row) for row in rows]
 
     def patch_finding(self, finding_id: str, patch: FindingPatch) -> FindingRecord:
         values = patch.model_dump(exclude_unset=True)
@@ -509,17 +553,69 @@ class ProjectRepository(SQLiteStore):
             if current is None:
                 raise KeyError(f"Finding not found: {finding_id}")
             return current
-        values["updated_at"] = now_iso()
+        before = self.get_finding(finding_id)
+        if before is None:
+            raise KeyError(f"Finding not found: {finding_id}")
         normalized: dict[str, Any] = {}
+        decisions: list[FindingDecisionRecord] = []
+        decision_time = now_iso()
         for key, value in values.items():
             if isinstance(value, (FindingStatus, Severity)):
                 value = value.value
             if key == "rfi_candidate" and value is not None:
                 value = 1 if value else 0
+            previous_value = getattr(before, key)
+            previous_db_value: Any = previous_value
+            if isinstance(previous_value, (FindingStatus, Severity)):
+                previous_db_value = previous_value.value
+            if key == "rfi_candidate":
+                previous_db_value = 1 if previous_value else 0
+            if previous_db_value == value:
+                continue
             normalized[key] = value
+            decisions.append(FindingDecisionRecord(
+                id=new_id("decision"),
+                project_id=before.project_id,
+                run_id=before.run_id,
+                finding_id=before.id,
+                issue_id=before.issue_id,
+                created_at=decision_time,
+                field_name=key,
+                previous_value=_decision_value(previous_value),
+                new_value=_decision_value(bool(value) if key == "rfi_candidate" else value),
+                reviewer="local_user",
+                note="Updated through local finding review.",
+            ))
+        if not normalized:
+            return before
+        normalized["updated_at"] = decision_time
         assignments = ", ".join(f"{key} = ?" for key in normalized)
         with self.connect() as conn:
             conn.execute(f"UPDATE findings SET {assignments} WHERE id = ?", list(normalized.values()) + [finding_id])
+            conn.executemany(
+                """
+                INSERT INTO finding_decisions (
+                    id, project_id, run_id, finding_id, issue_id, created_at, field_name,
+                    previous_value, new_value, reviewer, note
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        decision.id,
+                        decision.project_id,
+                        decision.run_id,
+                        decision.finding_id,
+                        decision.issue_id,
+                        decision.created_at,
+                        decision.field_name,
+                        decision.previous_value,
+                        decision.new_value,
+                        decision.reviewer,
+                        decision.note,
+                    )
+                    for decision in decisions
+                ],
+            )
         current = self.get_finding(finding_id)
         if current is None:
             raise KeyError(f"Finding not found: {finding_id}")
@@ -681,6 +777,32 @@ def _progress_from_row(row: sqlite3.Row) -> ProgressEvent:
         message=row["message"],
         percent=row["percent"],
         level=row["level"],
+    )
+
+
+def _decision_value(value: Any) -> str:
+    if isinstance(value, (FindingStatus, Severity)):
+        return value.value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _finding_decision_from_row(row: sqlite3.Row) -> FindingDecisionRecord:
+    return FindingDecisionRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        run_id=row["run_id"],
+        finding_id=row["finding_id"],
+        issue_id=row["issue_id"],
+        created_at=row["created_at"],
+        field_name=row["field_name"],
+        previous_value=row["previous_value"],
+        new_value=row["new_value"],
+        reviewer=row["reviewer"],
+        note=row["note"],
     )
 
 
