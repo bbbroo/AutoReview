@@ -27,6 +27,7 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Review runs through an isolated Python worker.
 - Worker launch failures and expected worker-side errors are reported with friendly AutoReview messages instead of raw Python tracebacks.
 - Finding persistence with stable `AR-####` issue IDs and deterministic fingerprints.
+- Run manifests and `finding_traceability.csv` include compact issue ID/fingerprint traces for CLI-vs-persisted comparison and regression audits.
 - Reviewer updates for status, severity, discipline, edited message, RFI flag, and notes.
 - Reviewer decision history is persisted for changed finding fields and exposed through the findings API/UI.
 - Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, and decision history.
@@ -52,7 +53,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
 
 Sample project smoke:
 

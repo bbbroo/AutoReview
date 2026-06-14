@@ -54,6 +54,11 @@ def _seed_sample_project(tmp_path: Path):
 def test_infer_file_role_for_common_reference_names():
     assert infer_file_role(Path("valve_list.xlsx")) == FileRole.VALVE_LIST
     assert infer_file_role(Path("drawing_index.csv")) == FileRole.DRAWING_INDEX
+    assert infer_file_role(Path("drawing_register.xlsx")) == FileRole.DRAWING_REGISTER
+    assert infer_file_role(Path("project_register.xlsx")) == FileRole.DRAWING_REGISTER
+    assert infer_file_role(Path("tie-in list.csv")) == FileRole.TIE_IN_LIST
+    assert infer_file_role(Path("design_basis.docx")) == FileRole.DESIGN_BASIS
+    assert infer_file_role(Path("gas_specs.pdf")) == FileRole.SPEC_LIST
     assert infer_file_role(Path("station_ifc.pdf")) == FileRole.DRAWING_SET
 
 
@@ -153,6 +158,8 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert manifest["profile"] == "balanced"
     assert manifest["input_files"]
     assert manifest["input_files"][0]["sha256"]
+    assert manifest["finding_fingerprints"] == [finding.fingerprint for finding in findings]
+    assert [row["issue_id"] for row in manifest["finding_trace"]] == [finding.issue_id for finding in findings]
     assert manifest["packet_finding_count"] == 1
     assert manifest["output_packet_path"] == str(backcheck_packet.packet_path)
     assert manifest["packet_export_settings"]["packet_mode"] == "backcheck"
@@ -160,6 +167,24 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert manifest["finding_status_counts"]["Accepted"] == 2
     assert manifest["finding_status_counts"]["Rejected"] == 1
     assert manifest["finding_status_counts"]["Backcheck Required"] == 1
+
+    all_non_debug_packet = export_review_packet(
+        project.database_path,
+        run.id,
+        PacketExportSettings(finding_scope=PacketFindingScope.ALL),
+    )
+    with fitz.open(all_non_debug_packet.packet_path) as packet_doc:
+        all_non_debug_text = "\n".join(page.get_text() for page in packet_doc)
+    assert rejected_finding.issue_id not in all_non_debug_text
+
+    full_debug_packet = export_review_packet(
+        project.database_path,
+        run.id,
+        PacketExportSettings(packet_mode=PacketMode.FULL_DEBUG),
+    )
+    with fitz.open(full_debug_packet.packet_path) as packet_doc:
+        full_debug_text = "\n".join(page.get_text() for page in packet_doc)
+    assert rejected_finding.issue_id in full_debug_text
 
 
 def test_reviewer_decision_history_tracks_finding_edits(tmp_path: Path):

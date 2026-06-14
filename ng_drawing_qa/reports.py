@@ -38,6 +38,24 @@ def write_issue_log(out_dir: Path, issues: list[Issue]) -> None:
     write_csv(out_dir / "issue_log.csv", [i.to_dict() for i in issues], ISSUE_FIELDS)
 
 
+def write_finding_traceability(out_dir: Path, finding_trace: list[dict[str, Any]]) -> None:
+    fields = [
+        "issue_id",
+        "fingerprint",
+        "rule_id",
+        "status",
+        "severity",
+        "discipline",
+        "sheet_number",
+        "page_number",
+        "output_pdf_page_number",
+        "found_text",
+        "confidence",
+        "source",
+    ]
+    write_csv(out_dir / "finding_traceability.csv", finding_trace, fields)
+
+
 def write_backcheck_log(out_dir: Path, issues: list[Issue]) -> None:
     fields = ISSUE_FIELDS + ["reviewer_decision", "date_closed"]
     rows = []

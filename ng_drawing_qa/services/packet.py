@@ -23,10 +23,12 @@ from ..schemas import (
     RunStatus,
 )
 from ..storage.sqlite import ProjectRepository, new_id, now_iso
-from .review import APP_VERSION, _manifest_outputs, _reference_overrides, load_project_references
+from .review import APP_VERSION, _finding_trace, _manifest_outputs, _reference_overrides, load_project_references
 
 
 def _finding_selected(finding: FindingRecord, settings: PacketExportSettings) -> bool:
+    if finding.status == FindingStatus.REJECTED and not settings.include_rejected_findings:
+        return False
     if settings.finding_scope == PacketFindingScope.ALL:
         return True
     if settings.finding_scope == PacketFindingScope.ACCEPTED_ONLY:
@@ -127,6 +129,8 @@ def _update_run_manifest_after_packet(
         rule_counts=dict(data.get("rule_counts", {})),
         severity_counts=dict(data.get("severity_counts", {})),
         finding_status_counts=dict(Counter(finding.status.value for finding in all_findings)),
+        finding_fingerprints=[finding.fingerprint for finding in all_findings],
+        finding_trace=[_finding_trace(finding) for finding in all_findings],
         input_files=list(data.get("input_files", [])),
         output_files=list(data.get("output_files", [])),
         output_packet_path=str(packet_path),

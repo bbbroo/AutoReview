@@ -60,6 +60,8 @@ python -m ng_drawing_qa.cli --list-rules
 python -m ng_drawing_qa.cli --generate-sample examples/generated_sample
 ```
 
+Every persisted UI, worker, and CLI run writes the same deterministic trace outputs, including `run_manifest.json`, `issue_log.csv`, and `finding_traceability.csv` with stable issue IDs and fingerprints.
+
 ## Local-Only Security
 
 AutoReview does not require cloud storage, authentication, external APIs, Bluebeam API access, or AI services. Drawing files and project data remain on the local computer by default. Future integrations must be optional and disabled by default.

@@ -8,8 +8,9 @@ import fitz
 
 from ng_drawing_qa.cli import main as cli_main
 from ng_drawing_qa.sample import generate_sample_project
-from ng_drawing_qa.schemas import FileRole, ProjectCreate
+from ng_drawing_qa.schemas import FileRole, PacketExportSettings, PacketFindingScope, ProjectCreate
 from ng_drawing_qa.services.files import ingest_file
+from ng_drawing_qa.services.packet import export_review_packet
 from ng_drawing_qa.services.projects import create_project
 from ng_drawing_qa.services.review import run_project_review
 from ng_drawing_qa.storage.sqlite import AppIndex, ProjectRepository
@@ -69,15 +70,24 @@ def test_cli_direct_pdf_uses_shared_persisted_review_workflow(tmp_path: Path):
     cli_run_dir = cli_run_dirs[0]
     assert (cli_run_dir / "project.sqlite").exists()
     assert (cli_run_dir / "issue_log.csv").exists()
+    assert (cli_run_dir / "finding_traceability.csv").exists()
     assert (cli_run_dir / "sample_natural_gas_drawing_set_reviewed_marked_up.pdf").exists()
     assert (cli_run_dir / "packets" / "single_review_packet.pdf").exists()
 
     persisted_repo, persisted_run_id = _seed_persisted_sample(tmp_path, sample_dir)
     persisted_findings = persisted_repo.list_findings(persisted_run_id)
+    persisted_packet = export_review_packet(
+        persisted_repo.db_path,
+        persisted_run_id,
+        PacketExportSettings(finding_scope=PacketFindingScope.ALL),
+    )
     cli_rows = _issue_rows(cli_run_dir / "issue_log.csv")
+    cli_trace_rows = _issue_rows(cli_run_dir / "finding_traceability.csv")
 
     assert len(cli_rows) == len(persisted_findings)
+    assert len(cli_trace_rows) == len(persisted_findings)
     assert [row["issue_id"] for row in cli_rows] == [finding.issue_id for finding in persisted_findings]
+    assert [row["fingerprint"] for row in cli_trace_rows] == [finding.fingerprint for finding in persisted_findings]
     assert {_fingerprint_like(row) for row in cli_rows} == {
         (
             finding.rule_id,
@@ -96,16 +106,24 @@ def test_cli_direct_pdf_uses_shared_persisted_review_workflow(tmp_path: Path):
     assert manifest["packet_finding_count"] == len(cli_rows)
     assert manifest["output_packet_path"].endswith("single_review_packet.pdf")
     assert manifest["finding_status_counts"]["Draft"] == len(cli_rows)
+    assert manifest["finding_fingerprints"] == [finding.fingerprint for finding in persisted_findings]
+    assert [row["fingerprint"] for row in manifest["finding_trace"]] == [finding.fingerprint for finding in persisted_findings]
 
     with fitz.open(cli_run_dir / "packets" / "single_review_packet.pdf") as packet:
         text = "\n".join(page.get_text() for page in packet)
         toc_titles = [item[1] for item in packet.get_toc()]
+    with fitz.open(persisted_packet.packet_path) as packet:
+        persisted_text = "\n".join(page.get_text() for page in packet)
+        persisted_toc_titles = [item[1] for item in packet.get_toc()]
     assert "Issue Index" in text
     assert "Marked-Up Drawing Set" in text
     assert "Rendered Reference Inputs" in text
     assert cli_rows[0]["issue_id"] in text
     assert "Issue Index" in toc_titles
     assert "Marked-Up Drawing Set" in toc_titles
+    assert toc_titles == persisted_toc_titles
+    for row in cli_rows:
+        assert row["issue_id"] in persisted_text
 
 
 def test_cli_dry_run_uses_shared_workflow_without_packet_export(tmp_path: Path):

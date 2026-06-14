@@ -104,6 +104,8 @@ class RunManifest:
     rule_counts: dict[str, int] = field(default_factory=dict)
     severity_counts: dict[str, int] = field(default_factory=dict)
     finding_status_counts: dict[str, int] = field(default_factory=dict)
+    finding_fingerprints: list[str] = field(default_factory=list)
+    finding_trace: list[dict[str, Any]] = field(default_factory=list)
     input_files: list[dict[str, Any]] = field(default_factory=list)
     output_files: list[dict[str, Any]] = field(default_factory=list)
     output_packet_path: str = ""

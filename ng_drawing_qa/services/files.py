@@ -48,6 +48,8 @@ def infer_file_role(path: Path) -> FileRole:
         return FileRole.DRAWING_SET
     if "drawing" in name and ("index" in name or "register" in name):
         return FileRole.DRAWING_INDEX if "index" in name else FileRole.DRAWING_REGISTER
+    if "register" in name and ("drawing" in name or "dwg" in name or "project" in name):
+        return FileRole.DRAWING_REGISTER
     if "valve" in name:
         return FileRole.VALVE_LIST
     if "line" in name:
@@ -60,7 +62,7 @@ def infer_file_role(path: Path) -> FileRole:
         return FileRole.DESIGN_BASIS
     if "spec" in name or "standard" in name:
         return FileRole.SPEC_LIST
-    if "tie" in name:
+    if "tie" in name or "tie-in" in name or "tie_in" in name or "tiein" in name:
         return FileRole.TIE_IN_LIST
     if "mto" in name or "material" in name or "bom" in name:
         return FileRole.MTO

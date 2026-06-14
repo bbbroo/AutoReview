@@ -23,7 +23,7 @@ Export can include:
 - backcheck findings: needs review, needs more information, RFI candidate, and backcheck required
 - all findings
 
-The default is accepted findings only.
+The default is accepted findings only. Rejected findings are excluded unless the export explicitly enables rejected findings; the built-in full debug mode does this for troubleshooting.
 
 ## Packet Modes
 
@@ -42,4 +42,4 @@ Generated packets include PDF bookmarks for the cover, issue index, critical/maj
 
 ## Traceability
 
-The same stable issue ID appears in the UI, SQLite, PDF markups, issue index, and support exports. Reviewer-edited wording is used in the packet; original generated wording remains stored with the finding.
+The same stable issue ID appears in the UI, SQLite, PDF markups, issue index, run manifest, `finding_traceability.csv`, and support exports. Reviewer-edited wording is used in the packet; original generated wording remains stored with the finding.

@@ -16,7 +16,7 @@ from ..issue_builder import IssueBuilder
 from ..models import Issue, RunManifest
 from ..pdf_utils import extract_page_info, extract_word_hits, export_extracted_text, export_words_csv
 from ..reference import load_aliases, load_ignore_patterns, load_reference_records, validate_reference_records
-from ..reports import write_all_reports, write_manifest
+from ..reports import write_all_reports, write_finding_traceability, write_manifest
 from ..rules.base import RuleContext
 from ..rules.core_rules import run_all_rules
 from ..rules.registry import RULE_METADATA_BY_ID
@@ -172,6 +172,23 @@ def _manifest_outputs(out_dir: Path) -> list[dict[str, Any]]:
     return outputs
 
 
+def _finding_trace(record: FindingRecord) -> dict[str, Any]:
+    return {
+        "issue_id": record.issue_id,
+        "fingerprint": record.fingerprint,
+        "rule_id": record.rule_id,
+        "status": record.status.value,
+        "severity": record.severity.value,
+        "discipline": record.discipline,
+        "sheet_number": record.sheet_number,
+        "page_number": record.page_number,
+        "output_pdf_page_number": record.output_pdf_page_number,
+        "found_text": record.found_text,
+        "confidence": record.confidence,
+        "source": record.source,
+    }
+
+
 def _active_rule_count(config: dict[str, Any]) -> int:
     return sum(1 for rule in config.get("rules", {}).values() if bool(rule.get("enabled", True)))
 
@@ -292,10 +309,13 @@ def run_project_review(
         manifest.rule_counts = dict(Counter(i.rule_id for i in issues))
         manifest.severity_counts = dict(Counter(i.severity for i in issues))
         manifest.finding_status_counts = {FindingStatus.DRAFT.value: len(issues)}
+        manifest.finding_fingerprints = [record.fingerprint for record in finding_records]
+        manifest.finding_trace = [_finding_trace(record) for record in finding_records]
         manifest.complete(started, doc.page_count, len(issues))
 
         repo.add_progress(run_id, "reports", "Writing support reports.", 92)
         write_all_reports(out_dir, issues, page_infos, hits, manifest, config)
+        write_finding_traceability(out_dir, manifest.finding_trace)
         manifest.output_files = _manifest_outputs(out_dir)
         write_manifest(out_dir, manifest)
         (out_dir / "run_inputs.json").write_text(
