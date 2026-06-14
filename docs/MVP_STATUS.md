@@ -21,7 +21,9 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Local-only desktop app startup through `.\scripts\dev.ps1`.
 - Project creation/opening with `project.sqlite`.
 - File ingestion, role inference, role editing, hashing, and project-local copies.
-- Validation for missing files, blank files, unsupported extensions, unreadable PDFs, low-searchability PDFs, malformed tables, missing required columns, and DOCX placeholders.
+- Validation for missing files, blank files, unsupported extensions, unreadable PDFs, low-searchability PDFs, malformed tables, missing required columns, blank reference tags, duplicate reference keys, suspicious reference values, bad saved mappings, and DOCX placeholders.
+- Reference analysis API and Input Files preview show inferred/saved/effective column mappings, required fields, row counts, parsed sample rows, and mapping warnings before running QA.
+- Reusable role-based reference column mappings are stored locally under `profiles/reference_mappings.json` and included in profile export/import.
 - Review runs through an isolated Python worker.
 - Finding persistence with stable `AR-####` issue IDs and deterministic fingerprints.
 - Reviewer updates for status, severity, discipline, edited message, RFI flag, and notes.
@@ -46,7 +48,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI test covers the finding trust panel sections for a selected finding.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
 
 Sample project smoke:
 
@@ -76,6 +78,7 @@ Private real-PDF smoke:
 - Decision history is local single-user only; there is no reviewer identity/permissions model by design.
 - DOCX support is text extraction only, not print-fidelity rendering.
 - Reference PDFs are preserved/rendered, but structured reconciliation still depends on CSV/XLSX columns.
+- Reference mapping editing is API-backed and previewed in the UI, but the UI does not yet provide a full column-mapping editor.
 - Title block extraction uses numeric configured regions and needs per-company tuning.
 - Large real drawings can generate noisy duplicate-sheet or low-searchability findings that need profile tuning.
 - CLI output now includes a transient project structure (`project.sqlite`, `inputs`, `profiles`, `packets`) inside the requested output folder rather than only loose report files.

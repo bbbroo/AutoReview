@@ -25,6 +25,7 @@ from ng_drawing_qa.services.files import infer_file_role, ingest_file
 from ng_drawing_qa.services.packet import export_review_packet
 from ng_drawing_qa.services.profiles import export_review_profile, import_review_profile
 from ng_drawing_qa.services.projects import create_project
+from ng_drawing_qa.services.reference_mappings import analyze_project_references, load_reference_mappings, save_reference_mapping
 from ng_drawing_qa.services.review import run_project_review
 from ng_drawing_qa.services.training import add_missed_finding, compare_against_golden, create_training_set, label_finding
 from ng_drawing_qa.services.validation import validate_project_inputs
@@ -209,6 +210,42 @@ def test_validation_reports_user_fixable_file_errors(tmp_path: Path):
     assert missing_columns[0].details["missing"] == ["tag"]
 
 
+def test_reference_analysis_uses_saved_mappings_and_flags_bad_rows(tmp_path: Path):
+    app_index = AppIndex(tmp_path / "app.sqlite")
+    project = create_project(ProjectCreate(name="Reference Mapping Test", root_path=tmp_path / "projects"), app_index)
+    repo = ProjectRepository(project.database_path)
+
+    valves_csv = tmp_path / "custom_valves.csv"
+    valves_csv.write_text(
+        "Valve ID,Size,Service\n"
+        "BV-101,2,Gas\n"
+        ",3,Gas\n"
+        "BV-101,2,Gas\n"
+        "notatag,4,Gas\n"
+        "wrong,4,Gas\n"
+        "bad,4,Gas\n",
+        encoding="utf-8",
+    )
+    valve_file = ingest_file(repo, project.id, project.root_path, valves_csv, role=FileRole.VALVE_LIST)
+
+    before_mapping = validate_project_inputs(repo.list_files(project.id), project_root=project.root_path)
+    assert any(issue.code == "MISSING_REQUIRED_COLUMNS" and issue.file_id == valve_file.id for issue in before_mapping)
+
+    saved = save_reference_mapping(project.database_path, FileRole.VALVE_LIST, {"tag": "Valve ID", "size": "Size", "service": "Service"})
+    assert saved.path.exists()
+    assert load_reference_mappings(project.root_path)[FileRole.VALVE_LIST]["tag"] == "Valve ID"
+
+    analyses = analyze_project_references(repo.list_files(project.id), project.root_path)
+    analysis = next(item for item in analyses if item.file_id == valve_file.id)
+    assert analysis.saved_mapping["tag"] == "Valve ID"
+    assert analysis.effective_mapping["tag"] == "Valve ID"
+    assert analysis.preview_rows[0].key_value == "BV-101"
+
+    codes = {issue.code for issue in analysis.issues}
+    assert "MISSING_REQUIRED_COLUMNS" not in codes
+    assert {"BLANK_REFERENCE_KEYS", "DUPLICATE_REFERENCE_KEYS", "SUSPICIOUS_REFERENCE_VALUES"} <= codes
+
+
 def test_training_set_labels_and_golden_regression(tmp_path: Path):
     project, repo = _seed_sample_project(tmp_path)
     run = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "training-test")
@@ -243,8 +280,11 @@ def test_training_set_labels_and_golden_regression(tmp_path: Path):
 
 def test_profile_export_import(tmp_path: Path):
     project, _ = _seed_sample_project(tmp_path)
+    save_reference_mapping(project.database_path, FileRole.VALVE_LIST, {"tag": "Valve Tag"})
     exported = export_review_profile(project.database_path, "balanced")
     imported = import_review_profile(project.database_path, Path(exported["path"]))
+    payload = json.loads(Path(exported["path"]).read_text(encoding="utf-8"))
 
     assert Path(exported["path"]).exists()
+    assert payload["reference_mappings"]["valve_list"]["tag"] == "Valve Tag"
     assert imported["profile_name"] == "balanced"

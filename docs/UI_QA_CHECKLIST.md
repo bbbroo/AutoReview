@@ -31,7 +31,9 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 3. Confirm inferred file roles are reasonable.
 4. Change at least one file role manually and confirm the table updates.
 5. Click Validate.
-6. Confirm missing drawing sets, blank files, unsupported formats, unreadable PDFs, malformed spreadsheets, missing required columns, DOCX placeholders, and low-searchability warnings show as readable messages.
+6. Click Analyze References.
+7. Confirm reference preview shows inferred/saved/effective mappings, required fields, row counts, sample rows, and file-specific warnings.
+8. Confirm missing drawing sets, blank files, unsupported formats, unreadable PDFs, malformed spreadsheets, missing required columns, blank reference tags, duplicate reference keys, suspicious reference values, stale mappings, DOCX placeholders, and low-searchability warnings show as readable messages.
 
 ## Profiles And Rules
 

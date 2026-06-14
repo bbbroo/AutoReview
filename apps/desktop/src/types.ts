@@ -67,6 +67,36 @@ export interface ValidationIssue {
   details?: Record<string, unknown>;
 }
 
+export interface ReferencePreviewRow {
+  row_number: number;
+  key_value: string;
+  values: Record<string, string>;
+  warnings: string[];
+}
+
+export interface ReferenceAnalysis {
+  file_id: string;
+  file_name: string;
+  role: FileRole;
+  extension: string;
+  headers: string[];
+  row_count: number;
+  required_fields: string[];
+  inferred_mapping: Record<string, string>;
+  saved_mapping: Record<string, string>;
+  effective_mapping: Record<string, string>;
+  preview_rows: ReferencePreviewRow[];
+  issues: ValidationIssue[];
+}
+
+export interface ReferenceMappingRecord {
+  project_id: string;
+  role: FileRole;
+  mapping: Record<string, string>;
+  updated_at: string;
+  path: string;
+}
+
 export interface RuleMetadata {
   rule_id: string;
   name: string;

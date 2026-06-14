@@ -55,6 +55,19 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     _ingest_sample_files(client, project["id"], sample_dir)
     files = client.get(f"/projects/{project['id']}/files").json()
     assert len(files) == 6
+    analysis = client.get(f"/projects/{project['id']}/references/analysis")
+    assert analysis.status_code == 200
+    analysis_body = analysis.json()
+    assert any(item["role"] == "valve_list" and item["effective_mapping"].get("tag") for item in analysis_body)
+    mapping = client.put(
+        f"/projects/{project['id']}/reference-mappings/valve_list",
+        json={"mapping": {"tag": "tag", "size": "size"}},
+    )
+    assert mapping.status_code == 200
+    assert mapping.json()["mapping"]["tag"] == "tag"
+    mappings = client.get(f"/projects/{project['id']}/reference-mappings")
+    assert mappings.status_code == 200
+    assert any(item["role"] == "valve_list" for item in mappings.json())
     patch = client.patch(f"/projects/{project['id']}/files/{files[1]['id']}", json={"role": "drawing_register"})
     assert patch.status_code == 200
     patch_back = client.patch(f"/projects/{project['id']}/files/{files[1]['id']}", json={"role": "drawing_index"})

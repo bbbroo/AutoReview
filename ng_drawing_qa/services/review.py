@@ -22,6 +22,7 @@ from ..rules.core_rules import run_all_rules
 from ..rules.registry import RULE_METADATA_BY_ID
 from ..schemas import FileRecord, FileRole, FindingEvidence, FindingRecord, FindingStatus, RunStatus, Severity
 from ..storage.sqlite import ProjectRepository, now_iso, new_id
+from .reference_mappings import apply_saved_reference_mappings
 from .validation import validate_project_inputs
 
 
@@ -210,7 +211,7 @@ def run_project_review(
         repo.update_run(run_id, status=RunStatus.RUNNING, started_at=now_iso())
         repo.add_progress(run_id, "validation", "Validating project inputs.", 5)
         files = repo.list_files(project_id)
-        validation_issues = validate_project_inputs(files)
+        validation_issues = validate_project_inputs(files, project_root=project.root_path)
         blocking = [issue for issue in validation_issues if issue.level == "error"]
         warnings.extend(issue.message for issue in validation_issues if issue.level != "error")
         if blocking:
@@ -221,7 +222,7 @@ def run_project_review(
         if drawing is None:
             raise MissingInputError("Select one drawing set PDF before running a review.")
 
-        config = load_config(config_path, profile=profile)
+        config = apply_saved_reference_mappings(load_config(config_path, profile=profile), project.root_path)
         config.setdefault("outputs", {})["single_review_packet_pdf"] = False
         config.setdefault("outputs", {})["dry_run"] = True
         overrides = _reference_overrides(files)

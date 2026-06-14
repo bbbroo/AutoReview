@@ -8,6 +8,8 @@ import type {
   PacketMode,
   PacketExportRecord,
   ProjectRecord,
+  ReferenceAnalysis,
+  ReferenceMappingRecord,
   ProgressEvent,
   RuleMetadata,
   RunComparisonSummary,
@@ -61,6 +63,13 @@ export const api = {
   updateFileRole: (projectId: string, fileId: string, role: FileRole) =>
     request<FileRecord>(`/projects/${projectId}/files/${fileId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
   validate: (projectId: string) => request<ValidationIssue[]>(`/projects/${projectId}/validate`, { method: "POST" }),
+  referenceAnalysis: (projectId: string) => request<ReferenceAnalysis[]>(`/projects/${projectId}/references/analysis`),
+  referenceMappings: (projectId: string) => request<ReferenceMappingRecord[]>(`/projects/${projectId}/reference-mappings`),
+  saveReferenceMapping: (projectId: string, role: FileRole, mapping: Record<string, string>) =>
+    request<ReferenceMappingRecord>(`/projects/${projectId}/reference-mappings/${role}`, {
+      method: "PUT",
+      body: JSON.stringify({ mapping })
+    }),
   startRun: (projectId: string, profile: string) =>
     request<RunRecord>(`/projects/${projectId}/runs`, { method: "POST", body: JSON.stringify({ profile }) }),
   run: (runId: string) => request<RunWithProgress>(`/runs/${runId}`),

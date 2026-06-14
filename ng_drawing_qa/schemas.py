@@ -118,6 +118,40 @@ class FileRecord(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ReferencePreviewRow(BaseModel):
+    row_number: int
+    key_value: str = ""
+    values: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ReferenceAnalysis(BaseModel):
+    file_id: str
+    file_name: str
+    role: FileRole
+    extension: str
+    headers: list[str] = Field(default_factory=list)
+    row_count: int = 0
+    required_fields: list[str] = Field(default_factory=list)
+    inferred_mapping: dict[str, str] = Field(default_factory=dict)
+    saved_mapping: dict[str, str] = Field(default_factory=dict)
+    effective_mapping: dict[str, str] = Field(default_factory=dict)
+    preview_rows: list[ReferencePreviewRow] = Field(default_factory=list)
+    issues: list[ValidationIssue] = Field(default_factory=list)
+
+
+class ReferenceMappingPatch(BaseModel):
+    mapping: dict[str, str] = Field(default_factory=dict)
+
+
+class ReferenceMappingRecord(BaseModel):
+    project_id: str
+    role: FileRole
+    mapping: dict[str, str] = Field(default_factory=dict)
+    updated_at: str
+    path: Path
+
+
 class RuleMetadata(BaseModel):
     rule_id: str
     name: str

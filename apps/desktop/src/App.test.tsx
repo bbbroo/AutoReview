@@ -58,6 +58,7 @@ describe("AutoReview desktop shell", () => {
       updated_at: "2026-06-14T12:00:00"
     }];
     responses["/projects/proj_1/files"] = [];
+    responses["/projects/proj_1/references/analysis"] = [];
     const runRecord = {
       id: "run_1",
       project_id: "proj_1",
@@ -150,5 +151,55 @@ describe("AutoReview desktop shell", () => {
     expect(screen.getByText("Drawing Index Reconciliation")).toBeInTheDocument();
     expect(screen.getByText("fingerprint123")).toBeInTheDocument();
     expect(screen.getByText("Draft -> Accepted")).toBeInTheDocument();
+  });
+
+  it("shows reference preview analysis for project input files", async () => {
+    responses["/projects"] = [{
+      id: "proj_1",
+      name: "Sample Project",
+      root_path: "C:/AutoReview/Sample",
+      database_path: "C:/AutoReview/Sample/project.sqlite",
+      created_at: "2026-06-14T12:00:00",
+      updated_at: "2026-06-14T12:00:00"
+    }];
+    responses["/projects/proj_1/files"] = [{
+      id: "file_1",
+      project_id: "proj_1",
+      role: "valve_list",
+      original_path: "C:/inputs/custom_valves.csv",
+      local_path: "C:/AutoReview/Sample/inputs/references/custom_valves.csv",
+      file_name: "custom_valves.csv",
+      extension: ".csv",
+      size_bytes: 100,
+      sha256: "abc123456789abc123",
+      created_at: "2026-06-14T12:00:00",
+      updated_at: "2026-06-14T12:00:00",
+      warnings: []
+    }];
+    responses["/projects/proj_1/history"] = [];
+    responses["/projects/proj_1/training-sets"] = [];
+    responses["/projects/proj_1/references/analysis"] = [{
+      file_id: "file_1",
+      file_name: "custom_valves.csv",
+      role: "valve_list",
+      extension: ".csv",
+      headers: ["Valve ID", "Size", "Service"],
+      row_count: 2,
+      required_fields: ["tag"],
+      inferred_mapping: {},
+      saved_mapping: { tag: "Valve ID" },
+      effective_mapping: { tag: "Valve ID", size: "Size", service: "Service" },
+      preview_rows: [{ row_number: 2, key_value: "BV-101", values: { tag: "BV-101", size: "2", service: "Gas" }, warnings: [] }],
+      issues: []
+    }];
+
+    render(<App />);
+    fireEvent.click(await screen.findByText("Sample Project"));
+    fireEvent.click(await screen.findByText("Input Files"));
+
+    expect(await screen.findByText("Reference Preview")).toBeInTheDocument();
+    expect(screen.getAllByText("custom_valves.csv").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/tag: Valve ID/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("BV-101").length).toBeGreaterThanOrEqual(1);
   });
 });

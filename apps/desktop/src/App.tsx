@@ -43,6 +43,7 @@ import type {
   PacketFindingScope,
   PacketMode,
   ProjectRecord,
+  ReferenceAnalysis,
   RegressionResult,
   RuleMetadata,
   RunComparisonSummary,
@@ -113,6 +114,7 @@ export default function App() {
   const [projectParent, setProjectParent] = useState("");
   const [files, setFiles] = useState<FileRecord[]>([]);
   const [validation, setValidation] = useState<ValidationIssue[]>([]);
+  const [referenceAnalyses, setReferenceAnalyses] = useState<ReferenceAnalysis[]>([]);
   const [rules, setRules] = useState<RuleMetadata[]>([]);
   const [profiles, setProfiles] = useState<Record<string, unknown>>({});
   const [profile, setProfile] = useState("balanced");
@@ -174,14 +176,16 @@ export default function App() {
 
   async function loadProjectData(nextProject: ProjectRecord) {
     setProject(nextProject);
-    const [fileList, runList, trainingList] = await Promise.all([
+    const [fileList, runList, trainingList, analyses] = await Promise.all([
       api.files(nextProject.id),
       api.history(nextProject.id),
-      api.trainingSets(nextProject.id)
+      api.trainingSets(nextProject.id),
+      api.referenceAnalysis(nextProject.id)
     ]);
     setFiles(fileList);
     setHistory(runList);
     setTrainingSets(trainingList);
+    setReferenceAnalyses(analyses);
     setSelectedTrainingSetId((current) => current || trainingList[0]?.id || "");
     if (runList[0]) {
       const run = await api.run(runList[0].id);
@@ -246,6 +250,7 @@ export default function App() {
       await api.ingestFiles(project.id, paths, newFileRole === "unknown" ? undefined : newFileRole);
       setFiles(await api.files(project.id));
       setValidation(await api.validate(project.id));
+      setReferenceAnalyses(await api.referenceAnalysis(project.id));
     } catch (error) {
       setMessage(displayError(error));
     } finally {
@@ -258,11 +263,27 @@ export default function App() {
     await api.updateFileRole(project.id, file.id, role);
     setFiles(await api.files(project.id));
     setValidation(await api.validate(project.id));
+    setReferenceAnalyses(await api.referenceAnalysis(project.id));
   }
 
   async function validateInputs() {
     if (!project) return;
     setValidation(await api.validate(project.id));
+  }
+
+  async function analyzeReferences() {
+    if (!project) return;
+    setBusy(true);
+    try {
+      const [issues, analyses] = await Promise.all([api.validate(project.id), api.referenceAnalysis(project.id)]);
+      setValidation(issues);
+      setReferenceAnalyses(analyses);
+      setMessage(`Analyzed ${analyses.length} reference file(s).`);
+    } catch (error) {
+      setMessage(displayError(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function startRun() {
@@ -453,9 +474,11 @@ export default function App() {
                   </select>
                   <Button appearance="primary" icon={<Add24Regular />} disabled={!project} onClick={() => void browseAndIngestFiles()}>Add Files</Button>
                   <Button icon={<CheckmarkCircle24Regular />} disabled={!project} onClick={() => void validateInputs()}>Validate</Button>
+                  <Button icon={<DocumentBulletList24Regular />} disabled={!project} onClick={() => void analyzeReferences()}>Analyze References</Button>
                 </div>
                 <FileTable files={files} onRoleChange={updateRole} />
                 <ValidationList issues={validation} />
+                <ReferencePreview analyses={referenceAnalyses} />
               </section>
             )}
 
@@ -706,6 +729,72 @@ function ValidationList({ issues }: { issues: ValidationIssue[] }) {
           <span>{issue.message}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function mappingSummary(mapping: Record<string, string>) {
+  const entries = Object.entries(mapping);
+  if (!entries.length) return "no mapped columns";
+  return entries.map(([field, column]) => `${field}: ${column}`).join(" | ");
+}
+
+function ReferencePreview({ analyses }: { analyses: ReferenceAnalysis[] }) {
+  if (!analyses.length) return null;
+  return (
+    <div className="reference-preview">
+      <div className="section-heading">
+        <span className="title-accent" />
+        <h3>Reference Preview</h3>
+      </div>
+      {analyses.map((analysis) => {
+        const fields = Object.keys(analysis.effective_mapping);
+        return (
+          <div className="reference-preview-item" key={analysis.file_id}>
+            <div className="reference-preview-header">
+              <div>
+                <strong>{analysis.file_name}</strong>
+                <span>{roleLabel(analysis.role)} | {analysis.row_count} row(s) | {analysis.headers.length} column(s)</span>
+              </div>
+              <Badge appearance="filled">{analysis.issues.some((issue) => issue.level === "error") ? "needs mapping" : "mapped"}</Badge>
+            </div>
+            <dl className="mapping-list">
+              <dt>Required</dt><dd>{analysis.required_fields.join(", ") || "none"}</dd>
+              <dt>Effective mapping</dt><dd>{mappingSummary(analysis.effective_mapping)}</dd>
+              <dt>Saved mapping</dt><dd>{mappingSummary(analysis.saved_mapping)}</dd>
+            </dl>
+            {!!analysis.issues.length && (
+              <div className="reference-issues">
+                {analysis.issues.map((issue, index) => (
+                  <span key={`${analysis.file_id}-${issue.code}-${index}`} className={`reference-issue ${issue.level}`}>{issue.code}: {issue.message}</span>
+                ))}
+              </div>
+            )}
+            {!!analysis.preview_rows.length && !!fields.length && (
+              <table className="data-table compact-table">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Key</th>
+                    {fields.slice(0, 6).map((field) => <th key={field}>{field}</th>)}
+                    <th>Warnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analysis.preview_rows.map((row) => (
+                    <tr key={`${analysis.file_id}-${row.row_number}`}>
+                      <td>{row.row_number}</td>
+                      <td>{row.key_value || "blank"}</td>
+                      {fields.slice(0, 6).map((field) => <td key={field}>{row.values[field] || ""}</td>)}
+                      <td>{row.warnings.join(", ") || "none"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

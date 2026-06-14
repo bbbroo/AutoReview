@@ -43,6 +43,16 @@ The validator reports missing expected columns. Rename columns or adjust mapping
 
 For MVP reconciliation, CSV/XLSX files need recognizable columns such as `sheet_number`, `tag`, `line_number`, `instrument_tag`, or `equipment_tag` depending on role. PDF references are preserved as evidence but are not yet structured table inputs.
 
+Use Input Files -> Analyze References to inspect inferred, saved, and effective mappings. If a real reference uses unusual headers, save a role-based mapping in `profiles/reference_mappings.json` or through the local reference mapping API. Stale saved mappings are reported as `BAD_COLUMN_MAPPING`.
+
+## Blank Or Duplicate Reference Tags
+
+Reference validation reports blank mapped keys and duplicate mapped keys before the review run. Fix the source list where possible. If duplicates are intentional, document the reason in project notes and consider a project-specific suppression/profile rule later.
+
+## Suspicious Reference Values
+
+`SUSPICIOUS_REFERENCE_VALUES` means many mapped identifiers or pressure values do not look like the expected role. Common causes are a wrong mapped column, a title/description column being treated as a tag column, or pressure text that needs cleanup before deterministic comparison.
+
 ## Packet Has No Findings
 
 Default packet scope is accepted findings only. Accept findings in the review screen or choose a broader export scope.

@@ -8,6 +8,7 @@ from typing import Any
 from ..config import load_config
 from ..errors import MissingInputError, ValidationError
 from ..storage.sqlite import ProjectRepository, now_iso
+from .reference_mappings import load_reference_mapping_payload, reference_mapping_path
 
 
 def export_review_profile(project_db_path: Path, profile_name: str) -> dict[str, Any]:
@@ -31,6 +32,7 @@ def export_review_profile(project_db_path: Path, profile_name: str) -> dict[str,
         "title_block": config.get("title_block", {}),
         "review": config.get("review", {}),
         "outputs": config.get("outputs", {}),
+        "reference_mappings": load_reference_mapping_payload(project.root_path).get("roles", {}),
     }
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return {"profile_name": profile_name, "path": str(out_path), "profile": payload}
@@ -53,4 +55,17 @@ def import_review_profile(project_db_path: Path, source_path: Path) -> dict[str,
     target.parent.mkdir(parents=True, exist_ok=True)
     if source_path.resolve() != target.resolve():
         shutil.copy2(source_path, target)
+    reference_mappings = payload.get("reference_mappings")
+    if isinstance(reference_mappings, dict):
+        mapping_path = reference_mapping_path(project.root_path)
+        mapping_path.parent.mkdir(parents=True, exist_ok=True)
+        mapping_payload = load_reference_mapping_payload(project.root_path)
+        mapping_payload["version"] = 1
+        mapping_payload["updated_at"] = now_iso()
+        mapping_payload["roles"] = {
+            str(role): {str(field): str(column) for field, column in mapping.items()}
+            for role, mapping in reference_mappings.items()
+            if isinstance(mapping, dict)
+        }
+        mapping_path.write_text(json.dumps(mapping_payload, indent=2), encoding="utf-8")
     return {"profile_name": profile_name, "path": str(target), "profile": payload}

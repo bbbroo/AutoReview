@@ -13,7 +13,18 @@ npm install
 .\scripts\dev.ps1
 ```
 
-Create a project, add a drawing set PDF, add optional CSV/XLSX reference files, validate inputs, choose a profile, run review, review findings, then export the packet.
+Create a project, add a drawing set PDF, add optional CSV/XLSX reference files, validate inputs, review the reference preview/mappings, choose a profile, run review, review findings, then export the packet.
+
+## Reference Preview
+
+On Input Files, use Validate and Analyze References before running QA. The preview shows:
+
+- inferred, saved, and effective column mappings
+- required fields for the selected file role
+- parsed sample rows
+- blank key values, duplicate tags/sheets, suspicious values, missing columns, and stale saved mappings
+
+Reusable role-based column mappings are stored locally in `profiles/reference_mappings.json` inside the project folder. They are included when you export a review profile.
 
 ## Useful Development Commands
 

@@ -26,6 +26,9 @@ from ng_drawing_qa.schemas import (
     PacketExportSettings,
     ProjectCreate,
     ProjectRecord,
+    ReferenceAnalysis,
+    ReferenceMappingPatch,
+    ReferenceMappingRecord,
     ProgressEvent,
     RegressionResult,
     RunCreate,
@@ -41,6 +44,7 @@ from ng_drawing_qa.services.files import ingest_file
 from ng_drawing_qa.services.packet import export_review_packet
 from ng_drawing_qa.services.profiles import export_review_profile, import_review_profile
 from ng_drawing_qa.services.projects import create_project, open_project
+from ng_drawing_qa.services.reference_mappings import analyze_project_references, list_reference_mapping_records, save_reference_mapping
 from ng_drawing_qa.services.training import add_missed_finding, compare_against_golden, create_training_set, label_finding
 from ng_drawing_qa.services.validation import validate_project_inputs
 from ng_drawing_qa.storage.sqlite import AppIndex, ProjectRepository
@@ -254,7 +258,26 @@ def _find_file(file_id: str):
 def validate_project(project_id: str) -> list[ValidationIssue]:
     project = _project_or_404(project_id)
     repo = _repo(project)
-    return validate_project_inputs(repo.list_files(project.id))
+    return validate_project_inputs(repo.list_files(project.id), project_root=project.root_path)
+
+
+@app.get("/projects/{project_id}/references/analysis", response_model=list[ReferenceAnalysis])
+def reference_analysis(project_id: str) -> list[ReferenceAnalysis]:
+    project = _project_or_404(project_id)
+    repo = _repo(project)
+    return analyze_project_references(repo.list_files(project.id), project.root_path)
+
+
+@app.get("/projects/{project_id}/reference-mappings", response_model=list[ReferenceMappingRecord])
+def reference_mappings(project_id: str) -> list[ReferenceMappingRecord]:
+    project = _project_or_404(project_id)
+    return list_reference_mapping_records(project.database_path)
+
+
+@app.put("/projects/{project_id}/reference-mappings/{role}", response_model=ReferenceMappingRecord)
+def update_reference_mapping(project_id: str, role: FileRole, patch: ReferenceMappingPatch) -> ReferenceMappingRecord:
+    project = _project_or_404(project_id)
+    return save_reference_mapping(project.database_path, role, patch.mapping)
 
 
 @app.post("/projects/{project_id}/runs", response_model=RunRecord)

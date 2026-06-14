@@ -15,7 +15,7 @@ AutoReview is a local hybrid desktop system.
 1. Electron starts the FastAPI sidecar on `127.0.0.1`.
 2. The UI creates or opens a local project folder.
 3. Files are copied into project-local `inputs` folders and recorded in `project.sqlite`.
-4. Validation checks paths, file type, PDF readability, searchability, and table columns.
+4. Validation checks paths, file type, PDF readability, searchability, table columns, reference mappings, blank keys, duplicate keys, and suspicious reference values.
 5. A review run is queued in SQLite.
 6. The sidecar launches an isolated Python worker process.
 7. The worker extracts text/coordinates, loads references, runs deterministic rules, writes support outputs, and persists findings.
@@ -46,6 +46,7 @@ project/
   logs/
   debug/
   profiles/
+    reference_mappings.json
   training/
   project.sqlite
 ```
