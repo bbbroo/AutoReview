@@ -1,0 +1,42 @@
+project:
+  name: Example Natural Gas QA Project
+  profile: regulator_station
+
+outputs:
+  timestamped_output_folder: true
+  insert_summary_page: true
+  annotate_pdf: true
+  export_text: false
+  export_words: false
+  html_report: true
+  excel_report: true
+  single_review_packet_pdf: true
+  single_review_packet_name: single_review_packet.pdf
+
+reference_files:
+  drawing_index: ""
+  valve_list: ""
+  line_list: ""
+  instrument_index: ""
+  equipment_list: ""
+
+normalization:
+  fuzzy_tags: true
+  remove_separators_for_match: false
+  alias_table: ""
+  ignore_patterns: ""
+
+pdf:
+  min_words_per_page: 20
+
+rules:
+  MATERIAL_SPEC_CHECK:
+    enabled: true
+    severity: Minor
+  COATING_NOTE_CHECK:
+    enabled: true
+    severity: Minor
+  AI_COMMENT_DRAFTS:
+    enabled: true
+  SYMBOL_RECOGNITION_STUB:
+    enabled: true

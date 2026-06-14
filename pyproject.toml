@@ -1,0 +1,13 @@
+[project]
+name = "bluebeam-ng-review-automation"
+version = "0.2.0"
+description = "Natural gas drawing set QA automation that creates Bluebeam-reviewable PDF markups and issue logs."
+requires-python = ">=3.10"
+dependencies = [
+  "pymupdf>=1.24.0",
+  "PyYAML>=6.0.1",
+  "openpyxl>=3.1.2"
+]
+
+[project.scripts]
+ng-drawing-qa = "ng_drawing_qa.cli:main"

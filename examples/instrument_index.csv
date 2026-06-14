@@ -1,0 +1,4 @@
+tag,type,service
+PT-101,Pressure Transmitter,Downstream
+PI-101,Pressure Indicator,Upstream
+PSH-101,Pressure Switch High,Overpressure

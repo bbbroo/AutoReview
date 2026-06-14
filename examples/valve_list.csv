@@ -1,0 +1,5 @@
+tag,type,size,service
+BV-101,Ball Valve,6 in,Inlet
+PSV-101,Relief Valve,2 in,Relief
+REG-101,Regulator,4 in,Worker
+REG-102,Regulator,4 in,Monitor
