@@ -29,6 +29,9 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, and decision history.
 - Packet export after reviewer decisions.
 - Default packet scope excludes rejected findings and includes accepted edited comments.
+- Packet exports record mode (`internal_qa`, `client_review`, `backcheck`, or `full_debug`) separately from deterministic finding scope.
+- Packet PDFs include bookmarks for major sections and drawing-page finding clusters.
+- Issue IDs in the packet front matter link to the related marked-up drawing page when the PDF viewer supports internal links.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
 - Run history, run comparison, training labels, missed findings, and golden regression foundation.
 - Support exports including CSV, XLSX, Markdown, HTML, logs, and diagnostics.
@@ -43,7 +46,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, reviewer decision history, packet export, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI test covers the finding trust panel sections for a selected finding.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI test covers the finding trust panel sections for a selected finding.
 
 Sample project smoke:
 
@@ -52,6 +55,7 @@ Sample project smoke:
 - Accepted, edited, and rejected findings.
 - Exported a packet.
 - Confirmed issue index, priority list, marked-up drawings, rendered reference inputs, source map, stable issue IDs, edited accepted wording, and rejected finding exclusion.
+- Confirmed packet bookmarks and issue-index links on generated sample packets.
 
 Private real-PDF smoke:
 
@@ -93,7 +97,7 @@ Private real-PDF smoke:
 - `electron`: high/moderate/low advisories fixed only by a semver-major Electron upgrade.
 - `vite`, `esbuild`, `@vitejs/plugin-react`: dev-server/build-chain advisories fixed only by semver-major Vite/plugin upgrades.
 - `vitest`, `vite-node`, `@vitest/mocker`: test tooling advisories fixed by semver-major Vitest upgrades.
-- `concurrently` via `shell-quote`: command-runner development dependency. A safe override attempt did not change the workspace resolution; defer to a dependency compatibility pass.
+- `concurrently` via `shell-quote`: command-runner development dependency. `npm audit fix` was attempted without `--force` and made no dependency changes; defer to a dependency compatibility pass or replace the dev command runner.
 
 Do not run `npm audit fix --force` in this repo without a dedicated dependency upgrade branch and full desktop smoke testing.
 

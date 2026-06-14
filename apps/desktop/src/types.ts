@@ -15,6 +15,13 @@ export type FileRole =
   | "unknown";
 
 export type Severity = "Critical" | "Major" | "Minor" | "Info";
+export type PacketMode = "internal_qa" | "client_review" | "backcheck" | "full_debug";
+export type PacketFindingScope =
+  | "accepted_only"
+  | "accepted_and_needs_review"
+  | "all_non_rejected"
+  | "backcheck"
+  | "all";
 export type FindingStatus =
   | "Draft"
   | "Accepted"

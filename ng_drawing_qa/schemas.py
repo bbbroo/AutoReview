@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Severity(str, Enum):
@@ -53,7 +53,15 @@ class PacketFindingScope(str, Enum):
     ACCEPTED_ONLY = "accepted_only"
     ACCEPTED_AND_NEEDS_REVIEW = "accepted_and_needs_review"
     ALL_NON_REJECTED = "all_non_rejected"
+    BACKCHECK = "backcheck"
     ALL = "all"
+
+
+class PacketMode(str, Enum):
+    INTERNAL_QA = "internal_qa"
+    CLIENT_REVIEW = "client_review"
+    BACKCHECK = "backcheck"
+    FULL_DEBUG = "full_debug"
 
 
 class ReviewProfileName(str, Enum):
@@ -234,6 +242,7 @@ class FindingPatch(BaseModel):
 
 
 class PacketExportSettings(BaseModel):
+    packet_mode: PacketMode = PacketMode.INTERNAL_QA
     finding_scope: PacketFindingScope = PacketFindingScope.ACCEPTED_ONLY
     include_reference_inputs: bool = True
     include_issue_index: bool = True
@@ -241,6 +250,25 @@ class PacketExportSettings(BaseModel):
     include_rejected_findings: bool = False
     include_debug_pages: bool = False
     packet_name: str = "single_review_packet.pdf"
+
+    @model_validator(mode="after")
+    def apply_packet_mode_defaults(self) -> "PacketExportSettings":
+        provided = getattr(self, "model_fields_set", set())
+        if "packet_mode" not in provided:
+            return self
+
+        if "finding_scope" not in provided:
+            if self.packet_mode == PacketMode.BACKCHECK:
+                self.finding_scope = PacketFindingScope.BACKCHECK
+            elif self.packet_mode == PacketMode.FULL_DEBUG:
+                self.finding_scope = PacketFindingScope.ALL
+            else:
+                self.finding_scope = PacketFindingScope.ACCEPTED_ONLY
+
+        if self.packet_mode == PacketMode.FULL_DEBUG:
+            self.include_rejected_findings = True
+            self.include_debug_pages = True
+        return self
 
 
 class PacketExportRecord(BaseModel):

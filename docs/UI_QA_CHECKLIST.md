@@ -68,9 +68,12 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 ## Packet Export
 
 1. Open Packet Export.
-2. Export with default accepted-only scope.
-3. Open the packet in Bluebeam or the system PDF viewer.
-4. Confirm the packet contains:
+2. Confirm Packet Mode defaults to internal QA and Finding Scope defaults to accepted only.
+3. Export with default accepted-only scope.
+4. Open the packet in Bluebeam or the system PDF viewer.
+5. Confirm the PDF bookmark/sidebar outline includes the cover, issue index, critical/major list, marked-up drawing set, rendered reference inputs, and source map.
+6. Click at least one issue ID in the issue index and confirm it jumps to the related marked-up drawing page when the viewer supports internal links.
+7. Confirm the packet contains:
    - Cover/disclaimer.
    - Issue summary and issue index.
    - Critical/major list.
@@ -78,8 +81,11 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
    - Marked-up drawing pages.
    - Rendered reference input section.
    - Source map.
-5. Confirm rejected findings are absent from the default packet.
-6. Export with a broader scope and confirm draft/non-rejected findings appear when selected.
+8. Confirm rejected findings are absent from the default packet.
+9. Change Packet Mode to backcheck and confirm Finding Scope changes to backcheck.
+10. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
+11. Change Packet Mode to full debug and confirm Finding Scope changes to all.
+12. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected.
 
 ## Run History And Comparison
 

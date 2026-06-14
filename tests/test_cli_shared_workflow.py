@@ -99,10 +99,13 @@ def test_cli_direct_pdf_uses_shared_persisted_review_workflow(tmp_path: Path):
 
     with fitz.open(cli_run_dir / "packets" / "single_review_packet.pdf") as packet:
         text = "\n".join(page.get_text() for page in packet)
+        toc_titles = [item[1] for item in packet.get_toc()]
     assert "Issue Index" in text
     assert "Marked-Up Drawing Set" in text
     assert "Rendered Reference Inputs" in text
     assert cli_rows[0]["issue_id"] in text
+    assert "Issue Index" in toc_titles
+    assert "Marked-Up Drawing Set" in toc_titles
 
 
 def test_cli_dry_run_uses_shared_workflow_without_packet_export(tmp_path: Path):

@@ -104,8 +104,17 @@ def _table_page(doc: fitz.Document, title: str, headers: list[str], rows: list[l
         _draw_footer(page, footer)
 
 
+def _table_page_count(rows: list[list[str]]) -> int:
+    row_h = 30
+    max_rows = int((PAGE_H - 92 - 42) // row_h)
+    return max(1, math.ceil(len(rows) / max_rows)) if max_rows else 1
+
+
 def build_issue_index_pdf(issues: list[Issue], source_pdf_page_count: int, config: dict[str, Any]) -> fitz.Document:
     doc = fitz.open()
+    packet_settings = config.get("packet", {})
+    include_issue_index = bool(packet_settings.get("include_issue_index", True))
+    include_critical_major_list = bool(packet_settings.get("include_critical_major_list", True))
 
     sev = Counter(i.severity for i in issues)
     rule = Counter(i.rule_id for i in issues)
@@ -144,6 +153,11 @@ def build_issue_index_pdf(issues: list[Issue], source_pdf_page_count: int, confi
         cover.insert_text((MARGIN + 18, y), f"{k}: {v}", fontsize=9)
         y += 13
 
+    y += 12
+    cover.insert_text((MARGIN, y), f"Packet mode: {packet_settings.get('packet_mode', 'internal_qa')}", fontsize=9)
+    y += 13
+    cover.insert_text((MARGIN, y), f"Finding scope: {packet_settings.get('finding_scope', 'accepted_only')}", fontsize=9)
+
     _draw_footer(cover, "Section 1: Packet summary")
 
     # Issue index pages.
@@ -157,26 +171,28 @@ def build_issue_index_pdf(issues: list[Issue], source_pdf_page_count: int, confi
             i.rule_id,
             f"{i.subject}: {i.message}",
         ])
-    _table_page(
-        doc,
-        "Issue Index",
-        headers,
-        rows,
-        "Section 2: Issue index. Open the marked-up drawing pages that follow to review visual markups.",
-        col_widths=[0.10, 0.08, 0.10, 0.22, 0.50],
-    )
+    if include_issue_index:
+        _table_page(
+            doc,
+            "Issue Index",
+            headers,
+            rows,
+            "Section 2: Issue index. Open the marked-up drawing pages that follow to review visual markups.",
+            col_widths=[0.10, 0.08, 0.10, 0.22, 0.50],
+        )
 
     # Critical / major quick list.
     crit = [i for i in issues if i.severity in {"Critical", "Major"}]
     rows = [[i.issue_id, i.severity, i.sheet_number, i.found_text, i.message] for i in crit]
-    _table_page(
-        doc,
-        "Critical and Major Findings",
-        ["ID", "Sev", "Sheet", "Found", "Message"],
-        rows,
-        "Section 3: Priority findings.",
-        col_widths=[0.10, 0.08, 0.10, 0.14, 0.58],
-    )
+    if include_critical_major_list:
+        _table_page(
+            doc,
+            "Critical and Major Findings",
+            ["ID", "Sev", "Sheet", "Found", "Message"],
+            rows,
+            "Section 3: Priority findings.",
+            col_widths=[0.10, 0.08, 0.10, 0.14, 0.58],
+        )
 
     return doc
 
@@ -352,6 +368,76 @@ def build_supplemental_reference_pdf(reference_files: list[Path]) -> fitz.Docume
     return doc
 
 
+def _add_issue_index_links(
+    packet: fitz.Document,
+    issues: list[Issue],
+    first_link_page_index: int,
+    last_link_page_index: int,
+    drawing_start_page_index: int,
+) -> None:
+    if not issues or last_link_page_index < first_link_page_index:
+        return
+
+    for issue in issues:
+        if issue.page_number < 1:
+            continue
+        target_page_index = drawing_start_page_index + issue.page_number - 1
+        if target_page_index >= packet.page_count:
+            continue
+        for page_index in range(first_link_page_index, last_link_page_index + 1):
+            page = packet[page_index]
+            try:
+                matches = page.search_for(issue.issue_id)
+            except Exception:
+                matches = []
+            for rect in matches:
+                link_rect = fitz.Rect(rect)
+                link_rect.x0 = max(0, link_rect.x0 - 1)
+                link_rect.y0 = max(0, link_rect.y0 - 1)
+                link_rect.x1 = min(page.rect.x1, link_rect.x1 + 4)
+                link_rect.y1 = min(page.rect.y1, link_rect.y1 + 2)
+                try:
+                    page.insert_link({"kind": fitz.LINK_GOTO, "from": link_rect, "page": target_page_index})
+                except Exception:
+                    continue
+
+
+def _set_packet_toc(
+    packet: fitz.Document,
+    issues: list[Issue],
+    issue_index_page_num: int | None,
+    critical_major_page_num: int | None,
+    drawing_divider_page_num: int,
+    drawing_start_page_num: int,
+    ref_divider_page_num: int,
+    source_map_page_num: int,
+) -> None:
+    toc: list[list[Any]] = [[1, "Cover and Review Disclaimer", 1]]
+    if issue_index_page_num:
+        toc.append([1, "Issue Index", issue_index_page_num])
+    if critical_major_page_num:
+        toc.append([1, "Critical and Major Findings", critical_major_page_num])
+    toc.append([1, "Marked-Up Drawing Set", drawing_divider_page_num])
+
+    issues_by_page: dict[int, list[Issue]] = defaultdict(list)
+    for issue in issues:
+        if issue.page_number >= 1:
+            issues_by_page[issue.page_number].append(issue)
+    for drawing_page_num, page_issues in sorted(issues_by_page.items()):
+        target_page_num = drawing_start_page_num + drawing_page_num - 1
+        if target_page_num > packet.page_count:
+            continue
+        sheet = page_issues[0].sheet_number or f"Drawing page {drawing_page_num}"
+        toc.append([2, f"{sheet} - {len(page_issues)} finding(s)", target_page_num])
+
+    toc.append([1, "Rendered Reference Inputs", ref_divider_page_num])
+    toc.append([1, "Packet Source Map", source_map_page_num])
+    try:
+        packet.set_toc(toc)
+    except Exception:
+        pass
+
+
 def build_single_review_packet(
     annotated_doc: fitz.Document,
     issues: list[Issue],
@@ -367,19 +453,30 @@ def build_single_review_packet(
     3. Rendered reference input files with issue-related rows highlighted
     """
     packet = fitz.open()
+    packet_settings = config.get("packet", {})
+    include_issue_index = bool(packet_settings.get("include_issue_index", True))
+    include_critical_major_list = bool(packet_settings.get("include_critical_major_list", True))
     index_doc = build_issue_index_pdf(issues, annotated_doc.page_count, config)
+    issue_index_rows = [[i.issue_id, i.severity, i.sheet_number, i.rule_id, f"{i.subject}: {i.message}"] for i in issues]
+    issue_index_page_count = _table_page_count(issue_index_rows) if include_issue_index else 0
+    issue_index_page_num = 2 if include_issue_index else None
+    critical_major_page_num = 2 + issue_index_page_count if include_critical_major_list else None
     packet.insert_pdf(index_doc)
     index_doc.close()
 
     # Section divider before drawings.
+    drawing_divider_page_num = packet.page_count + 1
     divider = packet.new_page(width=PAGE_W, height=PAGE_H)
     _draw_header(divider, "Marked-Up Drawing Set", "The pages after this divider are the Bluebeam-reviewable drawing pages with draft automated markups.")
-    _add_note(divider, fitz.Rect(MARGIN, 90, PAGE_W - MARGIN, 150), "Use this section to review the actual visual markups. The issue index at the front helps you find issues by ID, sheet, severity, and rule.", "Info")
+    _add_note(divider, fitz.Rect(MARGIN, 90, PAGE_W - MARGIN, 150), "Use this section to review the actual visual markups. The issue index at the front helps you find issues by ID, sheet, severity, and rule. Issue IDs in the front matter link to drawing pages when the PDF viewer supports internal links.", "Info")
     _draw_footer(divider, "Section 4: Marked-up drawings")
 
+    drawing_start_page_index = packet.page_count
+    drawing_start_page_num = drawing_start_page_index + 1
     packet.insert_pdf(annotated_doc)
 
     # References section.
+    ref_divider_page_num = packet.page_count + 1
     ref_divider = packet.new_page(width=PAGE_W, height=PAGE_H)
     _draw_header(ref_divider, "Rendered Reference Inputs", "Input lists printed into the packet so all evidence is available in one PDF.")
     _add_note(ref_divider, fitz.Rect(MARGIN, 90, PAGE_W - MARGIN, 150), "Reference-list rows related to findings are shaded. CSV/Excel files are still exported, but this PDF is intended to be the single review source.", "Info")
@@ -396,11 +493,14 @@ def build_single_review_packet(
         supplemental_doc.close()
 
     # Appendix / source map.
+    source_map_page_num = packet.page_count + 1
     page = packet.new_page(width=PAGE_W, height=PAGE_H)
     _draw_header(page, "Packet Source Map", "How to use this single PDF")
     y = 88
     bullets = [
         "Start with the Issue Index to triage findings by severity, sheet, and rule.",
+        "Use PDF bookmarks for section navigation and drawing-page finding clusters.",
+        "Click issue IDs in the front matter to jump to the related marked-up drawing page when supported by the viewer.",
         "Use the Marked-Up Drawing Set section to review the actual visual comments.",
         "Use the Rendered Reference Inputs section to verify list-driven issues without opening Excel.",
         "CSV/Excel/HTML outputs are optional support files, not the primary review source.",
@@ -412,6 +512,24 @@ def build_single_review_packet(
             y += 16
         y += 4
     _draw_footer(page, "Section 6: Source map")
+
+    _add_issue_index_links(
+        packet,
+        issues,
+        first_link_page_index=0,
+        last_link_page_index=max(0, drawing_divider_page_num - 2),
+        drawing_start_page_index=drawing_start_page_index,
+    )
+    _set_packet_toc(
+        packet,
+        issues,
+        issue_index_page_num=issue_index_page_num,
+        critical_major_page_num=critical_major_page_num,
+        drawing_divider_page_num=drawing_divider_page_num,
+        drawing_start_page_num=drawing_start_page_num,
+        ref_divider_page_num=ref_divider_page_num,
+        source_map_page_num=source_map_page_num,
+    )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     packet.save(out_path, garbage=4, deflate=True)

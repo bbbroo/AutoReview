@@ -90,17 +90,24 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     assert history.status_code == 200
     assert {item["field_name"] for item in history.json()} == history_fields
 
-    packet = client.post(f"/runs/{run_id}/export-packet", json={"finding_scope": "accepted_only", "packet_name": "api_packet.pdf"})
+    packet = client.post(
+        f"/runs/{run_id}/export-packet",
+        json={"packet_mode": "client_review", "finding_scope": "accepted_only", "packet_name": "api_packet.pdf"},
+    )
     assert packet.status_code == 200, packet.text
     packet_body = packet.json()
+    assert packet_body["settings"]["packet_mode"] == "client_review"
     assert packet_body["finding_count"] == 1
     packet_path = Path(packet_body["packet_path"])
     assert packet_path.exists()
     with fitz.open(packet_path) as doc:
         text = "\n".join(page.get_text() for page in doc)
+        toc_titles = [item[1] for item in doc.get_toc()]
     assert "API edited accepted wording." in text
     assert findings[0]["issue_id"] in text
     assert findings[1]["issue_id"] not in text
+    assert "Issue Index" in toc_titles
+    assert "Marked-Up Drawing Set" in toc_titles
 
     second_run = client.post(f"/projects/{project['id']}/runs", json={"profile": "balanced"})
     assert second_run.status_code == 200

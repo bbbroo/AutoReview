@@ -15,6 +15,7 @@ from ng_drawing_qa.schemas import (
     MissedFindingCreate,
     PacketExportSettings,
     PacketFindingScope,
+    PacketMode,
     ProjectCreate,
     TrainingLabel,
     TrainingLabelRequest,
@@ -73,6 +74,7 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert findings[0].original_message == findings[0].edited_message
     assert findings[0].evidence.reason
 
+    assert len(findings) >= 4
     repo.patch_finding(findings[0].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
     repo.patch_finding(findings[1].id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
     repo.patch_finding(findings[2].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Second accepted reviewer wording."))
@@ -90,6 +92,12 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert packet.packet_path.exists()
     with fitz.open(packet.packet_path) as packet_doc:
         packet_text = "\n".join(page.get_text() for page in packet_doc)
+        toc_titles = [item[1] for item in packet_doc.get_toc()]
+        front_links = [
+            link
+            for page_index in range(min(packet_doc.page_count, 4))
+            for link in packet_doc[page_index].get_links()
+        ]
     assert "Issue Index" in packet_text
     assert "Marked-Up Drawing Set" in packet_text
     assert "Rendered Reference Inputs" in packet_text
@@ -97,16 +105,41 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert "Reviewer-approved wording." in packet_text
     assert findings[0].issue_id in packet_text
     assert findings[1].issue_id not in packet_text
+    assert "Issue Index" in toc_titles
+    assert "Marked-Up Drawing Set" in toc_titles
+    assert "Rendered Reference Inputs" in toc_titles
+    assert "Packet Source Map" in toc_titles
+    assert any(link["kind"] == fitz.LINK_GOTO for link in front_links)
+
+    repo.patch_finding(findings[3].id, FindingPatch(status=FindingStatus.BACKCHECK_REQUIRED, edited_message="Backcheck-required wording."))
+    backcheck_packet = export_review_packet(
+        project.database_path,
+        run.id,
+        PacketExportSettings(packet_mode=PacketMode.BACKCHECK),
+    )
+    assert backcheck_packet.settings.finding_scope == PacketFindingScope.BACKCHECK
+    assert backcheck_packet.finding_count == 1
+    debug_settings = PacketExportSettings(packet_mode=PacketMode.FULL_DEBUG, finding_scope=PacketFindingScope.ALL)
+    assert debug_settings.include_rejected_findings is True
+    assert debug_settings.include_debug_pages is True
+    with fitz.open(backcheck_packet.packet_path) as packet_doc:
+        backcheck_text = "\n".join(page.get_text() for page in packet_doc)
+    assert "Backcheck-required wording." in backcheck_text
+    assert "Reviewer-approved wording." not in backcheck_text
+    assert findings[1].issue_id not in backcheck_text
 
     manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["run_id"] == run.id
     assert manifest["profile"] == "balanced"
     assert manifest["input_files"]
     assert manifest["input_files"][0]["sha256"]
-    assert manifest["packet_finding_count"] == 2
-    assert manifest["output_packet_path"] == str(packet.packet_path)
+    assert manifest["packet_finding_count"] == 1
+    assert manifest["output_packet_path"] == str(backcheck_packet.packet_path)
+    assert manifest["packet_export_settings"]["packet_mode"] == "backcheck"
+    assert manifest["packet_export_settings"]["finding_scope"] == "backcheck"
     assert manifest["finding_status_counts"]["Accepted"] == 2
     assert manifest["finding_status_counts"]["Rejected"] == 1
+    assert manifest["finding_status_counts"]["Backcheck Required"] == 1
 
 
 def test_reviewer_decision_history_tracks_finding_edits(tmp_path: Path):

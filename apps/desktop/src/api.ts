@@ -4,6 +4,8 @@ import type {
   FindingDecisionRecord,
   FindingRecord,
   FindingStatus,
+  PacketFindingScope,
+  PacketMode,
   PacketExportRecord,
   ProjectRecord,
   ProgressEvent,
@@ -75,10 +77,15 @@ export const api = {
       rfi_candidate: boolean;
     }>
   ) => request<FindingRecord>(`/findings/${findingId}`, { method: "PATCH", body: JSON.stringify(patch) }),
-  exportPacket: (runId: string, findingScope: string) =>
+  exportPacket: (runId: string, findingScope: PacketFindingScope, packetMode: PacketMode) =>
     request<PacketExportRecord>(`/runs/${runId}/export-packet`, {
       method: "POST",
-      body: JSON.stringify({ finding_scope: findingScope, include_reference_inputs: true, packet_name: "single_review_packet.pdf" })
+      body: JSON.stringify({
+        packet_mode: packetMode,
+        finding_scope: findingScope,
+        include_reference_inputs: true,
+        packet_name: "single_review_packet.pdf"
+      })
     }),
   history: (projectId: string) => request<RunRecord[]>(`/projects/${projectId}/history`),
   compareRuns: (baseRunId: string, compareRunId: string) =>

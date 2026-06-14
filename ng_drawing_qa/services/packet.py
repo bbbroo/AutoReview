@@ -38,6 +38,13 @@ def _finding_selected(finding: FindingRecord, settings: PacketExportSettings) ->
             FindingStatus.RFI_CANDIDATE,
             FindingStatus.BACKCHECK_REQUIRED,
         }
+    if settings.finding_scope == PacketFindingScope.BACKCHECK:
+        return finding.status in {
+            FindingStatus.NEEDS_REVIEW,
+            FindingStatus.NEEDS_MORE_INFORMATION,
+            FindingStatus.RFI_CANDIDATE,
+            FindingStatus.BACKCHECK_REQUIRED,
+        }
     if settings.finding_scope == PacketFindingScope.ALL_NON_REJECTED:
         return finding.status != FindingStatus.REJECTED
     return False
@@ -178,6 +185,12 @@ def export_review_packet(
     config.setdefault("outputs", {})["insert_summary_page"] = False
     config.setdefault("outputs", {})["single_review_packet_pdf"] = True
     config.setdefault("outputs", {})["single_review_packet_name"] = settings.packet_name
+    config.setdefault("packet", {})["packet_mode"] = settings.packet_mode.value
+    config.setdefault("packet", {})["finding_scope"] = settings.finding_scope.value
+    config.setdefault("packet", {})["include_issue_index"] = settings.include_issue_index
+    config.setdefault("packet", {})["include_critical_major_list"] = settings.include_critical_major_list
+    config.setdefault("packet", {})["include_reference_inputs"] = settings.include_reference_inputs
+    config.setdefault("packet", {})["include_debug_pages"] = settings.include_debug_pages
 
     overrides = _reference_overrides(files)
     refs = load_project_references(config, overrides)

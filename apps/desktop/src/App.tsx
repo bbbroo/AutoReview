@@ -40,6 +40,8 @@ import type {
   FileRole,
   FindingRecord,
   FindingStatus,
+  PacketFindingScope,
+  PacketMode,
   ProjectRecord,
   RegressionResult,
   RuleMetadata,
@@ -79,6 +81,12 @@ const emptyFilters = {
 
 const BOOTSTRAP_TIMEOUT_MS = 2500;
 
+function defaultScopeForPacketMode(mode: PacketMode): PacketFindingScope {
+  if (mode === "backcheck") return "backcheck";
+  if (mode === "full_debug") return "all";
+  return "accepted_only";
+}
+
 function displayError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return message.toLowerCase().includes("failed to fetch") ? "Failed to fetch" : message;
@@ -114,7 +122,8 @@ export default function App() {
   const [findings, setFindings] = useState<FindingRecord[]>([]);
   const [selectedFindingId, setSelectedFindingId] = useState("");
   const [filters, setFilters] = useState(emptyFilters);
-  const [packetScope, setPacketScope] = useState("accepted_only");
+  const [packetMode, setPacketMode] = useState<PacketMode>("internal_qa");
+  const [packetScope, setPacketScope] = useState<PacketFindingScope>("accepted_only");
   const [packetPath, setPacketPath] = useState("");
   const [comparison, setComparison] = useState<RunComparisonSummary | null>(null);
   const [trainingSets, setTrainingSets] = useState<TrainingSetRecord[]>([]);
@@ -289,7 +298,7 @@ export default function App() {
     if (!currentRun) return;
     setBusy(true);
     try {
-      const packet = await api.exportPacket(currentRun.run.id, packetScope);
+      const packet = await api.exportPacket(currentRun.run.id, packetScope, packetMode);
       setPacketPath(packet.packet_path);
       setMessage(`Packet exported with ${packet.finding_count} finding(s).`);
     } catch (error) {
@@ -301,6 +310,11 @@ export default function App() {
 
   async function openPacket() {
     if (packetPath && window.autoreview) await window.autoreview.openPath(packetPath);
+  }
+
+  function updatePacketMode(mode: PacketMode) {
+    setPacketMode(mode);
+    setPacketScope(defaultScopeForPacketMode(mode));
   }
 
   async function compareLatestRuns() {
@@ -507,11 +521,19 @@ export default function App() {
             {section === "export" && (
               <section className="panel">
                 <div className="toolbar">
+                  <label>Packet mode</label>
+                  <select value={packetMode} onChange={(event) => updatePacketMode(event.target.value as PacketMode)}>
+                    <option value="internal_qa">internal QA</option>
+                    <option value="client_review">client review</option>
+                    <option value="backcheck">backcheck</option>
+                    <option value="full_debug">full debug</option>
+                  </select>
                   <label>Finding scope</label>
-                  <select value={packetScope} onChange={(event) => setPacketScope(event.target.value)}>
+                  <select value={packetScope} onChange={(event) => setPacketScope(event.target.value as PacketFindingScope)}>
                     <option value="accepted_only">accepted only</option>
                     <option value="accepted_and_needs_review">accepted and needs review</option>
                     <option value="all_non_rejected">all non-rejected</option>
+                    <option value="backcheck">backcheck</option>
                     <option value="all">all findings</option>
                   </select>
                   <Button appearance="primary" icon={<DocumentPdf24Regular />} disabled={!currentRun} onClick={() => void exportPacket()}>Export Packet</Button>
