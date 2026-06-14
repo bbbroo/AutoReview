@@ -19,18 +19,26 @@ from ng_drawing_qa.schemas import (
     FileRole,
     FindingPatch,
     FindingRecord,
+    MissedFindingCreate,
+    MissedFindingRecord,
     PacketExportRecord,
     PacketExportSettings,
     ProjectCreate,
     ProjectRecord,
     ProgressEvent,
+    RegressionResult,
     RunCreate,
     RunRecord,
+    TrainingLabelRecord,
+    TrainingLabelRequest,
+    TrainingSetCreate,
+    TrainingSetRecord,
     ValidationIssue,
 )
 from ng_drawing_qa.services.files import ingest_file
 from ng_drawing_qa.services.packet import export_review_packet
 from ng_drawing_qa.services.projects import create_project, open_project
+from ng_drawing_qa.services.training import add_missed_finding, compare_against_golden, create_training_set, label_finding
 from ng_drawing_qa.services.validation import validate_project_inputs
 from ng_drawing_qa.storage.sqlite import AppIndex, ProjectRepository
 
@@ -55,6 +63,10 @@ class RunComparisonSummary(BaseModel):
     resolved_issue_ids: list[str]
     repeated_issue_ids: list[str]
     changed: list[dict[str, Any]]
+
+
+class RegressionRunRequest(BaseModel):
+    run_id: str | None = None
 
 
 app = FastAPI(title="AutoReview Local Sidecar", version="0.3.0")
@@ -101,6 +113,15 @@ def _find_finding(finding_id: str) -> tuple[ProjectRecord, ProjectRepository, Fi
         if finding is not None:
             return project, repo, finding
     raise HTTPException(status_code=404, detail=f"Finding not found: {finding_id}")
+
+
+def _find_training_set(training_set_id: str) -> tuple[ProjectRecord, ProjectRepository, TrainingSetRecord]:
+    for project in INDEX.list_projects():
+        repo = _repo(project)
+        training_set = repo.get_training_set(training_set_id)
+        if training_set is not None:
+            return project, repo, training_set
+    raise HTTPException(status_code=404, detail=f"Training set not found: {training_set_id}")
 
 
 def _spawn_review_worker(project: ProjectRecord, run: RunRecord) -> None:
@@ -278,6 +299,42 @@ def compare_runs(base_run_id: str, compare_run_id: str) -> RunComparisonSummary:
         repeated_issue_ids=repeated,
         changed=changed,
     )
+
+
+@app.post("/projects/{project_id}/training-sets", response_model=TrainingSetRecord)
+def create_training_set_route(project_id: str, request: TrainingSetCreate) -> TrainingSetRecord:
+    project = _project_or_404(project_id)
+    normalized = TrainingSetCreate(
+        name=request.name,
+        source_project_id=project.id,
+        source_run_id=request.source_run_id,
+        notes=request.notes,
+    )
+    return create_training_set(project.database_path, normalized)
+
+
+@app.get("/projects/{project_id}/training-sets", response_model=list[TrainingSetRecord])
+def list_training_sets(project_id: str) -> list[TrainingSetRecord]:
+    project = _project_or_404(project_id)
+    return _repo(project).list_training_sets(project.id)
+
+
+@app.post("/training-sets/{training_set_id}/labels", response_model=TrainingLabelRecord)
+def label_training_finding(training_set_id: str, request: TrainingLabelRequest) -> TrainingLabelRecord:
+    project, _, _ = _find_training_set(training_set_id)
+    return label_finding(project.database_path, training_set_id, request)
+
+
+@app.post("/training-sets/{training_set_id}/missed-findings", response_model=MissedFindingRecord)
+def add_training_missed_finding(training_set_id: str, request: MissedFindingCreate) -> MissedFindingRecord:
+    project, _, _ = _find_training_set(training_set_id)
+    return add_missed_finding(project.database_path, training_set_id, request)
+
+
+@app.post("/training-sets/{training_set_id}/regression", response_model=RegressionResult)
+def run_training_regression(training_set_id: str, request: RegressionRunRequest | None = None) -> RegressionResult:
+    project, _, _ = _find_training_set(training_set_id)
+    return compare_against_golden(project.database_path, training_set_id, request.run_id if request else None)
 
 
 def run() -> None:

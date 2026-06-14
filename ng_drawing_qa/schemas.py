@@ -262,8 +262,60 @@ class TrainingSetCreate(BaseModel):
     notes: str = ""
 
 
+class TrainingSetRecord(BaseModel):
+    id: str
+    project_id: str
+    source_run_id: str | None = None
+    name: str
+    notes: str = ""
+    golden_path: Path | None = None
+    created_at: str
+
+
 class TrainingLabelRequest(BaseModel):
     finding_id: str
     label: TrainingLabel
     notes: str = ""
     save_as_suppression: bool = False
+
+
+class TrainingLabelRecord(BaseModel):
+    id: str
+    training_set_id: str
+    finding_id: str | None = None
+    fingerprint: str
+    label: TrainingLabel
+    notes: str = ""
+    save_as_suppression: bool = False
+    created_at: str
+
+
+class MissedFindingCreate(BaseModel):
+    rule_id: str
+    sheet_number: str
+    expected_message: str
+    severity: Severity = Severity.MAJOR
+    notes: str = ""
+
+
+class MissedFindingRecord(BaseModel):
+    id: str
+    training_set_id: str
+    rule_id: str
+    sheet_number: str
+    expected_message: str
+    severity: Severity
+    notes: str = ""
+    created_at: str
+
+
+class RegressionResult(BaseModel):
+    training_set_id: str
+    source_run_id: str | None
+    expected_count: int
+    actual_count: int
+    missing_fingerprints: list[str] = Field(default_factory=list)
+    new_fingerprints: list[str] = Field(default_factory=list)
+    changed: list[dict[str, Any]] = Field(default_factory=list)
+    false_positive_count: int = 0
+    missed_finding_count: int = 0

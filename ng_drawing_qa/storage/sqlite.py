@@ -15,6 +15,7 @@ from ..schemas import (
     FindingPatch,
     FindingRecord,
     FindingStatus,
+    MissedFindingRecord,
     PacketExportRecord,
     PacketExportSettings,
     ProjectRecord,
@@ -22,6 +23,9 @@ from ..schemas import (
     RunRecord,
     RunStatus,
     Severity,
+    TrainingLabel,
+    TrainingLabelRecord,
+    TrainingSetRecord,
 )
 
 
@@ -140,6 +144,7 @@ CREATE TABLE IF NOT EXISTS training_sets (
     source_run_id TEXT,
     name TEXT NOT NULL,
     notes TEXT NOT NULL,
+    golden_path TEXT,
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS training_labels (
@@ -191,6 +196,9 @@ class SQLiteStore:
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.executescript(PROJECT_SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(training_sets)").fetchall()}
+            if "golden_path" not in columns:
+                conn.execute("ALTER TABLE training_sets ADD COLUMN golden_path TEXT")
 
 
 class AppIndex:
@@ -536,6 +544,87 @@ class ProjectRepository(SQLiteStore):
             )
         return record
 
+    def create_training_set(self, record: TrainingSetRecord) -> TrainingSetRecord:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO training_sets (id, project_id, source_run_id, name, notes, golden_path, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.project_id,
+                    record.source_run_id,
+                    record.name,
+                    record.notes,
+                    str(record.golden_path) if record.golden_path else None,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def get_training_set(self, training_set_id: str) -> TrainingSetRecord | None:
+        with self.connect() as conn:
+            row = conn.execute("SELECT * FROM training_sets WHERE id = ?", (training_set_id,)).fetchone()
+        return _training_set_from_row(row) if row else None
+
+    def list_training_sets(self, project_id: str) -> list[TrainingSetRecord]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM training_sets WHERE project_id = ? ORDER BY created_at DESC", (project_id,)).fetchall()
+        return [_training_set_from_row(row) for row in rows]
+
+    def add_training_label(self, record: TrainingLabelRecord) -> TrainingLabelRecord:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO training_labels (
+                    id, training_set_id, finding_id, fingerprint, label, notes, save_as_suppression, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.training_set_id,
+                    record.finding_id,
+                    record.fingerprint,
+                    record.label.value,
+                    record.notes,
+                    1 if record.save_as_suppression else 0,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def list_training_labels(self, training_set_id: str) -> list[TrainingLabelRecord]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM training_labels WHERE training_set_id = ? ORDER BY created_at", (training_set_id,)).fetchall()
+        return [_training_label_from_row(row) for row in rows]
+
+    def add_missed_finding(self, record: MissedFindingRecord) -> MissedFindingRecord:
+        with self.connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO missed_findings (
+                    id, training_set_id, rule_id, sheet_number, expected_message, severity, notes, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.id,
+                    record.training_set_id,
+                    record.rule_id,
+                    record.sheet_number,
+                    record.expected_message,
+                    record.severity.value,
+                    record.notes,
+                    record.created_at,
+                ),
+            )
+        return record
+
+    def list_missed_findings(self, training_set_id: str) -> list[MissedFindingRecord]:
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM missed_findings WHERE training_set_id = ? ORDER BY created_at", (training_set_id,)).fetchall()
+        return [_missed_finding_from_row(row) for row in rows]
+
 
 def _project_from_row(row: sqlite3.Row) -> ProjectRecord:
     return ProjectRecord(
@@ -626,4 +715,42 @@ def _finding_from_row(row: sqlite3.Row) -> FindingRecord:
         evidence=FindingEvidence.model_validate_json(row["evidence_json"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+    )
+
+
+def _training_set_from_row(row: sqlite3.Row) -> TrainingSetRecord:
+    return TrainingSetRecord(
+        id=row["id"],
+        project_id=row["project_id"],
+        source_run_id=row["source_run_id"],
+        name=row["name"],
+        notes=row["notes"],
+        golden_path=Path(row["golden_path"]) if row["golden_path"] else None,
+        created_at=row["created_at"],
+    )
+
+
+def _training_label_from_row(row: sqlite3.Row) -> TrainingLabelRecord:
+    return TrainingLabelRecord(
+        id=row["id"],
+        training_set_id=row["training_set_id"],
+        finding_id=row["finding_id"],
+        fingerprint=row["fingerprint"],
+        label=TrainingLabel(row["label"]),
+        notes=row["notes"],
+        save_as_suppression=bool(row["save_as_suppression"]),
+        created_at=row["created_at"],
+    )
+
+
+def _missed_finding_from_row(row: sqlite3.Row) -> MissedFindingRecord:
+    return MissedFindingRecord(
+        id=row["id"],
+        training_set_id=row["training_set_id"],
+        rule_id=row["rule_id"],
+        sheet_number=row["sheet_number"],
+        expected_message=row["expected_message"],
+        severity=Severity(row["severity"]),
+        notes=row["notes"],
+        created_at=row["created_at"],
     )

@@ -1,0 +1,15 @@
+{
+  "name": "autoreview",
+  "private": true,
+  "version": "0.3.0",
+  "workspaces": [
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/desktop run dev",
+    "build": "npm --workspace apps/desktop run build",
+    "test": "python -m pytest && npm --workspace apps/desktop run test",
+    "backend": "python -m uvicorn apps.backend.autoreview_backend.main:app --host 127.0.0.1 --port 8765",
+    "sample": "python -m ng_drawing_qa.cli --generate-sample examples/generated_sample"
+  }
+}
