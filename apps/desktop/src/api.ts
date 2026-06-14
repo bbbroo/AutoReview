@@ -81,6 +81,7 @@ export const api = {
       status: FindingStatus;
       severity: Severity;
       discipline: string;
+      owner: string;
       edited_message: string;
       reviewer_notes: string;
       rfi_candidate: boolean;

@@ -337,6 +337,8 @@ class RulePerformanceSummary(BaseModel):
     needs_better_wording_count: int = 0
     rule_needs_tuning_count: int = 0
     missed_finding_count: int = 0
+    accepted_count: int = 0
+    accepted_rate: float = 0.0
 
 
 class TrainingLabel(str, Enum):

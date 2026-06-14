@@ -744,6 +744,50 @@ select {
   overflow-wrap: anywhere;
 }
 
+.mapping-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dfe7f2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mapping-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mapping-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));
+  gap: 8px;
+}
+
+.mapping-editor-grid label,
+.checkbox-row {
+  display: grid;
+  gap: 5px;
+}
+
+.mapping-editor-grid span {
+  color: #4e5a72;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checkbox-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+}
+
 .reference-issues {
   display: flex;
   flex-wrap: wrap;

@@ -220,6 +220,7 @@ export interface RunComparisonSummary {
   status_changed_issue_ids: string[];
   severity_changed_issue_ids: string[];
   message_changed_issue_ids: string[];
+  backcheck_required_issue_ids: string[];
   changed: Array<Record<string, unknown>>;
 }
 
@@ -267,6 +268,8 @@ export interface RegressionResult {
     needs_better_wording_count: number;
     rule_needs_tuning_count: number;
     missed_finding_count: number;
+    accepted_count: number;
+    accepted_rate: number;
   }>;
 }
 

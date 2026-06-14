@@ -11,6 +11,8 @@ The product output is one single-source review packet PDF: cover, review disclai
 - FastAPI sidecar for projects, files, validation, runs, findings, packet export, history, comparison, and training sets.
 - Electron + React UI for project setup, file ingestion, profile selection, run progress, findings review, packet export, history, settings, and training.
 - Reviewer workflow for accepting, rejecting, editing, reclassifying, and annotating findings before export.
+- Findings review trust panel with rule explanation, evidence, reviewer action guidance, owner/RFI controls, notes, and decision history.
+- Reference preview and profile-backed CSV/XLSX column mapping editor for common engineering reference lists.
 - Deterministic rules with metadata for UI display.
 - Golden training set foundation for false positives, missed findings, and regression checks.
 

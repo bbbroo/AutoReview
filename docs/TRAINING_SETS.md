@@ -16,9 +16,9 @@ Golden comparison reports:
 
 - expected, actual, missing, new, and changed finding counts
 - false-positive and missed-finding label counts
-- per-rule performance rows with expected, actual, matched, missing, new, changed, false-positive, wording, tuning, and missed counts
+- per-rule performance rows with expected, actual, accepted count, accepted rate, matched, missing, new, changed, false-positive, wording, tuning, and missed counts
 
-The rule summary is intended for practical rule tuning. It is not an AI training score and does not prove engineering correctness.
+The accepted rate is a reviewer-trust tuning signal. Rules with many findings and low accepted rates should be reviewed for noisy matching, missing profile controls, unclear wording, or suppressions. The rule summary is not an AI training score and does not prove engineering correctness.
 
 ## Stored Data
 
@@ -30,6 +30,8 @@ project.sqlite
 ```
 
 SQLite stores labels and missed findings. The golden JSON stores deterministic fingerprints and expected finding attributes.
+
+Golden rows include issue ID, fingerprint, rule ID, severity, status, subject, edited message, sheet number, and found text so regression can detect message/severity drift without relying on unstable database IDs.
 
 ## Real PDFs
 

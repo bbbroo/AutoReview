@@ -20,6 +20,7 @@ from ng_drawing_qa.schemas import (
     FileRole,
     FindingPatch,
     FindingRecord,
+    FindingStatus,
     MissedFindingCreate,
     MissedFindingRecord,
     PacketExportRecord,
@@ -73,6 +74,7 @@ class RunComparisonSummary(BaseModel):
     status_changed_issue_ids: list[str] = Field(default_factory=list)
     severity_changed_issue_ids: list[str] = Field(default_factory=list)
     message_changed_issue_ids: list[str] = Field(default_factory=list)
+    backcheck_required_issue_ids: list[str] = Field(default_factory=list)
     changed: list[dict[str, Any]]
 
 
@@ -343,10 +345,13 @@ def compare_runs(base_run_id: str, compare_run_id: str) -> RunComparisonSummary:
     status_changed: list[str] = []
     severity_changed: list[str] = []
     message_changed: list[str] = []
+    backcheck_required: list[str] = []
     changed: list[dict[str, Any]] = []
     for key in sorted(set(base_findings) & set(compare_findings)):
         before = base_findings[key]
         after = compare_findings[key]
+        if after.status == FindingStatus.BACKCHECK_REQUIRED:
+            backcheck_required.append(after.issue_id)
         diffs = {}
         for field in ["severity", "edited_message", "status", "confidence"]:
             before_value = getattr(before, field)
@@ -377,6 +382,7 @@ def compare_runs(base_run_id: str, compare_run_id: str) -> RunComparisonSummary:
         status_changed_issue_ids=status_changed,
         severity_changed_issue_ids=severity_changed,
         message_changed_issue_ids=message_changed,
+        backcheck_required_issue_ids=backcheck_required,
         changed=changed,
     )
 

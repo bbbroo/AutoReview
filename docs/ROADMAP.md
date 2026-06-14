@@ -15,6 +15,7 @@
 - React findings review UI
 - FastAPI sidecar
 - project setup, file roles, validation, run status, finding edits, packet export
+- mocked React/API project-to-packet workflow coverage
 
 ## Phase 3: Training And Regression
 
@@ -23,12 +24,16 @@
 - missed finding records
 - golden comparison
 - regression tests
+- per-rule accepted-rate and false-positive usefulness summaries
 
 ## Phase 4: Company Readiness
 
 - profile import/export UI
+- desktop reference mapping editor
+- real-project local smoke profile tuning
 - richer diagnostics
 - revision comparison UI refinements
+- backcheck-required comparison workflow
 - packaging scripts
 - Windows installer
 - signed releases

@@ -81,6 +81,19 @@ const emptyFilters = {
 };
 
 const BOOTSTRAP_TIMEOUT_MS = 2500;
+const ROLE_MAPPING_FIELDS: Partial<Record<FileRole, string[]>> = {
+  drawing_index: ["sheet_number", "sheet_title", "revision", "issue_date", "status"],
+  drawing_register: ["sheet_number", "sheet_title", "revision", "issue_date", "status"],
+  valve_list: ["tag", "sheet_number", "type", "size", "service", "notes"],
+  line_list: ["tag", "sheet_number", "size", "service", "maop", "design_pressure", "test_pressure", "material", "spec", "coating", "notes"],
+  instrument_index: ["tag", "sheet_number", "type", "service", "notes"],
+  equipment_list: ["tag", "sheet_number", "type", "service", "notes"],
+  spec_list: ["spec", "material", "coating", "notes"],
+  tie_in_list: ["tag", "sheet_number", "description", "status", "notes"],
+  mto: ["tag", "material", "size", "quantity", "spec", "notes"],
+  alias_table: ["alias", "canonical"],
+  ignore_patterns: ["pattern"]
+};
 
 function defaultScopeForPacketMode(mode: PacketMode): PacketFindingScope {
   if (mode === "backcheck") return "backcheck";
@@ -95,6 +108,19 @@ function displayError(error: unknown) {
 
 function roleLabel(value: string) {
   return value.replaceAll("_", " ");
+}
+
+function fieldLabel(value: string) {
+  const labels: Record<string, string> = {
+    tag: "tag / line number",
+    sheet_number: "sheet number",
+    sheet_title: "drawing title",
+    issue_date: "issue date",
+    maop: "MAOP",
+    design_pressure: "design pressure",
+    test_pressure: "test pressure"
+  };
+  return labels[value] ?? value.replaceAll("_", " ");
 }
 
 function severityClass(severity: Severity) {
@@ -279,6 +305,20 @@ export default function App() {
       setValidation(issues);
       setReferenceAnalyses(analyses);
       setMessage(`Analyzed ${analyses.length} reference file(s).`);
+    } catch (error) {
+      setMessage(displayError(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveReferenceMapping(role: FileRole, mapping: Record<string, string>) {
+    if (!project) return;
+    setBusy(true);
+    try {
+      await api.saveReferenceMapping(project.id, role, mapping);
+      setReferenceAnalyses(await api.referenceAnalysis(project.id));
+      setMessage(`Saved ${roleLabel(role)} mapping profile.`);
     } catch (error) {
       setMessage(displayError(error));
     } finally {
@@ -478,7 +518,7 @@ export default function App() {
                 </div>
                 <FileTable files={files} onRoleChange={updateRole} />
                 <ValidationList issues={validation} />
-                <ReferencePreview analyses={referenceAnalyses} />
+                <ReferencePreview analyses={referenceAnalyses} onSaveMapping={saveReferenceMapping} />
               </section>
             )}
 
@@ -739,7 +779,13 @@ function mappingSummary(mapping: Record<string, string>) {
   return entries.map(([field, column]) => `${field}: ${column}`).join(" | ");
 }
 
-function ReferencePreview({ analyses }: { analyses: ReferenceAnalysis[] }) {
+function ReferencePreview({
+  analyses,
+  onSaveMapping
+}: {
+  analyses: ReferenceAnalysis[];
+  onSaveMapping?: (role: FileRole, mapping: Record<string, string>) => Promise<void>;
+}) {
   if (!analyses.length) return null;
   return (
     <div className="reference-preview">
@@ -763,6 +809,9 @@ function ReferencePreview({ analyses }: { analyses: ReferenceAnalysis[] }) {
               <dt>Effective mapping</dt><dd>{mappingSummary(analysis.effective_mapping)}</dd>
               <dt>Saved mapping</dt><dd>{mappingSummary(analysis.saved_mapping)}</dd>
             </dl>
+            {analysis.headers.length > 0 && onSaveMapping && (
+              <ReferenceMappingEditor analysis={analysis} onSaveMapping={onSaveMapping} />
+            )}
             {!!analysis.issues.length && (
               <div className="reference-issues">
                 {analysis.issues.map((issue, index) => (
@@ -795,6 +844,60 @@ function ReferencePreview({ analyses }: { analyses: ReferenceAnalysis[] }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ReferenceMappingEditor({
+  analysis,
+  onSaveMapping
+}: {
+  analysis: ReferenceAnalysis;
+  onSaveMapping: (role: FileRole, mapping: Record<string, string>) => Promise<void>;
+}) {
+  const fields = useMemo(() => {
+    const configured = ROLE_MAPPING_FIELDS[analysis.role] ?? [];
+    const discovered = Object.keys({ ...analysis.effective_mapping, ...analysis.saved_mapping });
+    return Array.from(new Set([...configured, ...analysis.required_fields, ...discovered]));
+  }, [analysis]);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setMapping({ ...analysis.effective_mapping, ...analysis.saved_mapping });
+  }, [analysis.file_id, analysis.effective_mapping, analysis.saved_mapping]);
+
+  function updateField(field: string, column: string) {
+    setMapping((current) => {
+      const next = { ...current };
+      if (column) next[field] = column;
+      else delete next[field];
+      return next;
+    });
+  }
+
+  if (!fields.length) return null;
+
+  return (
+    <div className="mapping-editor">
+      <div className="mapping-editor-header">
+        <strong>Column Mapping</strong>
+        <Button size="small" icon={<Save24Regular />} onClick={() => void onSaveMapping(analysis.role, mapping)}>Save Mapping</Button>
+      </div>
+      <div className="mapping-editor-grid">
+        {fields.map((field) => (
+          <label key={field}>
+            <span>{fieldLabel(field)}</span>
+            <select
+              aria-label={`Map ${fieldLabel(field)} for ${analysis.file_name}`}
+              value={mapping[field] ?? ""}
+              onChange={(event) => updateField(field, event.target.value)}
+            >
+              <option value="">not mapped</option>
+              {analysis.headers.map((header) => <option key={header} value={header}>{header}</option>)}
+            </select>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }
@@ -909,6 +1012,15 @@ function coordinateText(finding: FindingRecord) {
   return `${finding.x0.toFixed(1)}, ${finding.y0.toFixed(1)}, ${finding.x1.toFixed(1)}, ${finding.y1.toFixed(1)}`;
 }
 
+function reviewerActionText(finding: FindingRecord) {
+  if (finding.status === "Accepted") return "Verify the evidence one final time, then include this accepted wording in the next packet export.";
+  if (finding.status === "Rejected") return "Confirm this is a false positive or not applicable; rejected findings stay out of default packets.";
+  if (finding.status === "Backcheck Required") return "Carry this into backcheck and verify the next drawing revision resolves the issue.";
+  if (finding.rfi_candidate || finding.status === "RFI Candidate") return "Review the evidence and decide whether this should become a formal RFI.";
+  if (finding.status === "Needs More Information") return "Collect missing drawing or reference evidence before accepting or rejecting.";
+  return "Review the matched text, source page, reference evidence, and rule notes; then edit, accept, reject, or assign for follow-up.";
+}
+
 function FindingDetail({
   finding,
   onPatch
@@ -918,10 +1030,14 @@ function FindingDetail({
 }) {
   const [message, setMessage] = useState("");
   const [notes, setNotes] = useState("");
+  const [owner, setOwner] = useState("");
+  const [rfiCandidate, setRfiCandidate] = useState(false);
 
   useEffect(() => {
     setMessage(finding?.edited_message ?? "");
     setNotes(finding?.reviewer_notes ?? "");
+    setOwner(finding?.owner ?? "");
+    setRfiCandidate(finding?.rfi_candidate ?? false);
   }, [finding?.id]);
 
   if (!finding) return <aside className="panel detail-panel empty-state">No finding selected.</aside>;
@@ -941,23 +1057,31 @@ function FindingDetail({
       </div>
 
       <label>Status</label>
-      <select value={finding.status} onChange={(event) => void onPatch(finding, { status: event.target.value as FindingStatus })}>
+      <select aria-label="Finding status" value={finding.status} onChange={(event) => void onPatch(finding, { status: event.target.value as FindingStatus })}>
         {FINDING_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
       </select>
 
       <label>Severity</label>
-      <select value={finding.severity} onChange={(event) => void onPatch(finding, { severity: event.target.value as Severity })}>
+      <select aria-label="Finding severity" value={finding.severity} onChange={(event) => void onPatch(finding, { severity: event.target.value as Severity })}>
         {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
       </select>
 
       <label>Discipline</label>
-      <Input value={finding.discipline} onChange={(_, data) => void onPatch(finding, { discipline: data.value })} />
+      <Input aria-label="Finding discipline" value={finding.discipline} onChange={(_, data) => void onPatch(finding, { discipline: data.value })} />
+
+      <label>Owner</label>
+      <Input aria-label="Finding owner" value={owner} onChange={(_, data) => setOwner(data.value)} />
+
+      <label className="checkbox-row">
+        <input type="checkbox" checked={rfiCandidate} onChange={(event) => setRfiCandidate(event.target.checked)} />
+        <span>RFI candidate</span>
+      </label>
 
       <label>Edited packet comment</label>
-      <Textarea value={message} resize="vertical" onChange={(_, data) => setMessage(data.value)} />
+      <Textarea aria-label="Edited packet comment" value={message} resize="vertical" onChange={(_, data) => setMessage(data.value)} />
       <label>Reviewer notes</label>
-      <Textarea value={notes} resize="vertical" onChange={(_, data) => setNotes(data.value)} />
-      <Button appearance="primary" icon={<Save24Regular />} onClick={() => void onPatch(finding, { edited_message: message, reviewer_notes: notes })}>Save Finding</Button>
+      <Textarea aria-label="Reviewer notes" value={notes} resize="vertical" onChange={(_, data) => setNotes(data.value)} />
+      <Button appearance="primary" icon={<Save24Regular />} onClick={() => void onPatch(finding, { edited_message: message, reviewer_notes: notes, owner, rfi_candidate: rfiCandidate })}>Save Finding</Button>
 
       <div className="trust-note">
         Deterministic draft finding. Review evidence and edit, accept, reject, or classify before packet export.
@@ -982,6 +1106,10 @@ function FindingDetail({
         <h4>Finding Evidence</h4>
         <dl>
           <dt>Why flagged</dt><dd>{finding.evidence.reason || finding.original_message}</dd>
+          <dt>Reviewer action</dt><dd>{reviewerActionText(finding)}</dd>
+          <dt>Status</dt><dd>{finding.status}</dd>
+          <dt>Owner</dt><dd>{finding.owner || "unassigned"}</dd>
+          <dt>RFI status</dt><dd>{finding.rfi_candidate ? "RFI candidate" : "not marked as RFI"}</dd>
           <dt>Original</dt><dd>{finding.original_message}</dd>
           <dt>Edited</dt><dd>{finding.edited_message}</dd>
           <dt>Matched text</dt><dd>{finding.found_text || "none"}</dd>
@@ -1111,7 +1239,7 @@ function TrainingSection({
               {!!regression.rule_performance.length && (
                 <table className="data-table compact-table">
                   <thead>
-                    <tr><th>Rule</th><th>Expected</th><th>Actual</th><th>Matched</th><th>Missing</th><th>New</th><th>Changed</th><th>FP</th><th>Missed</th></tr>
+                    <tr><th>Rule</th><th>Expected</th><th>Actual</th><th>Accepted</th><th>Accepted Rate</th><th>Matched</th><th>Missing</th><th>New</th><th>Changed</th><th>FP</th><th>Missed</th></tr>
                   </thead>
                   <tbody>
                     {regression.rule_performance.map((rule) => (
@@ -1119,6 +1247,8 @@ function TrainingSection({
                         <td className="mono">{rule.rule_id}</td>
                         <td>{rule.expected_count}</td>
                         <td>{rule.actual_count}</td>
+                        <td>{rule.accepted_count}</td>
+                        <td>{Math.round(rule.accepted_rate * 100)}%</td>
                         <td>{rule.matched_count}</td>
                         <td>{rule.missing_count}</td>
                         <td>{rule.new_count}</td>
@@ -1148,6 +1278,7 @@ function ComparisonSummary({ comparison }: { comparison: RunComparisonSummary })
       <div><strong>{comparison.status_changed_issue_ids.length}</strong><span>status changed</span></div>
       <div><strong>{comparison.severity_changed_issue_ids.length}</strong><span>severity changed</span></div>
       <div><strong>{comparison.message_changed_issue_ids.length}</strong><span>message changed</span></div>
+      <div><strong>{comparison.backcheck_required_issue_ids.length}</strong><span>backcheck required</span></div>
       <div><strong>{comparison.changed.length}</strong><span>changed</span></div>
     </div>
   );

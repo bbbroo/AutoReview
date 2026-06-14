@@ -303,6 +303,7 @@ def test_training_set_labels_and_golden_regression(tmp_path: Path):
     run = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "training-test")
     run_project_review(project.database_path, project.id, run.id, "balanced")
     findings = repo.list_findings(run.id)
+    repo.patch_finding(findings[0].id, FindingPatch(status=FindingStatus.ACCEPTED))
     training_set = create_training_set(
         project.database_path,
         TrainingSetCreate(name="Golden Sample", source_project_id=project.id, source_run_id=run.id, notes="sample"),
@@ -331,6 +332,8 @@ def test_training_set_labels_and_golden_regression(tmp_path: Path):
     rules = {row.rule_id: row for row in result.rule_performance}
     assert findings[0].rule_id in rules
     assert rules[findings[0].rule_id].false_positive_count == 1
+    assert rules[findings[0].rule_id].accepted_count >= 1
+    assert rules[findings[0].rule_id].accepted_rate > 0
     assert rules["VALVE_TAG_RECONCILIATION"].missed_finding_count >= 1
     assert sum(row.expected_count for row in result.rule_performance) == len(findings)
     assert sum(row.actual_count for row in result.rule_performance) == len(findings)

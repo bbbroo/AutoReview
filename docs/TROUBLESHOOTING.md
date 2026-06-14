@@ -51,6 +51,8 @@ For MVP reconciliation, CSV/XLSX files need recognizable columns such as `sheet_
 
 Use Input Files -> Analyze References to inspect inferred, saved, and effective mappings. If a real reference uses unusual headers, save a role-based mapping in `profiles/reference_mappings.json` or through the local reference mapping API. Stale saved mappings are reported as `BAD_COLUMN_MAPPING`.
 
+In the desktop UI, use the Column Mapping editor inside Reference Preview to save mappings for headers such as `Valve ID`, `Drawing No`, `Line Number`, `MAOP`, `Test Pressure`, `Material`, `Spec`, `Coating`, and `Notes`. Rerun Analyze References after saving and confirm the effective mapping changed before running QA.
+
 ## Blank Or Duplicate Reference Tags
 
 Reference validation reports blank mapped keys and duplicate mapped keys before the review run. Fix the source list where possible. If duplicates are intentional, document the reason in project notes and consider a project-specific suppression/profile rule later.
@@ -62,6 +64,18 @@ Reference validation reports blank mapped keys and duplicate mapped keys before 
 ## Packet Has No Findings
 
 Default packet scope is accepted findings only. Accept findings in the review screen or choose a broader export scope.
+
+If a finding was rejected, it is intentionally excluded from normal packet exports even when a broad scope is selected. Use Full Debug only when troubleshooting rejected findings.
+
+## Too Many False Positives
+
+Start with the Findings Review panel and Training tab:
+
+1. Reject noisy findings and label representative examples as false positives.
+2. Add reviewer notes describing the false-positive pattern.
+3. Create or update a training set and run regression.
+4. Check per-rule accepted rate and false-positive count.
+5. Tune profile settings, reference mappings, aliases, ignored phrases, sheet-number patterns, title-block regions, OCR thresholds, or rule enablement before adding new rules.
 
 ## Packet Export Is Blocked
 

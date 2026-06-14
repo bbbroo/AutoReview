@@ -141,13 +141,18 @@ def _rule_performance_summary(
                 "needs_better_wording_count": 0,
                 "rule_needs_tuning_count": 0,
                 "missed_finding_count": 0,
+                "accepted_count": 0,
+                "accepted_rate": 0.0,
             }
         return by_rule[rule_id]
 
     for row in expected.values():
         bucket(str(row.get("rule_id") or "UNKNOWN_RULE"))["expected_count"] += 1
     for finding in actual.values():
-        bucket(str(finding.rule_id))["actual_count"] += 1
+        counts = bucket(str(finding.rule_id))
+        counts["actual_count"] += 1
+        if finding.status.value == "Accepted":
+            counts["accepted_count"] += 1
     for fingerprint in sorted(set(expected) & set(actual)):
         bucket(_rule_for_fingerprint(fingerprint, expected, actual, labels))["matched_count"] += 1
     for fingerprint in missing:
@@ -173,10 +178,12 @@ def _rule_performance_summary(
     for missed in missed_findings:
         bucket(missed.rule_id)["missed_finding_count"] += 1
 
-    return [
-        RulePerformanceSummary(rule_id=rule_id, **counts)
-        for rule_id, counts in sorted(by_rule.items(), key=lambda item: item[0])
-    ]
+    summaries: list[RulePerformanceSummary] = []
+    for rule_id, counts in sorted(by_rule.items(), key=lambda item: item[0]):
+        actual_count = counts.get("actual_count", 0)
+        counts["accepted_rate"] = round(counts.get("accepted_count", 0) / actual_count, 3) if actual_count else 0.0
+        summaries.append(RulePerformanceSummary(rule_id=rule_id, **counts))
+    return summaries
 
 
 def compare_against_golden(project_db_path: Path, training_set_id: str, run_id: str | None = None) -> RegressionResult:

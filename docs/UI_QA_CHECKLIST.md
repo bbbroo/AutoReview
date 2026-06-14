@@ -33,7 +33,9 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 5. Click Validate.
 6. Click Analyze References.
 7. Confirm reference preview shows inferred/saved/effective mappings, required fields, row counts, sample rows, and file-specific warnings.
-8. Confirm missing drawing sets, blank files, unsupported formats, unreadable PDFs, malformed spreadsheets, missing required columns, blank reference tags, duplicate reference keys, suspicious reference values, stale mappings, DOCX placeholders, and low-searchability warnings show as readable messages.
+8. In the Column Mapping editor, map at least one unusual header such as `Valve ID` to tag / line number and save it.
+9. Confirm the saved mapping is reflected in the effective/saved mapping summary and persisted under the project profile.
+10. Confirm missing drawing sets, blank files, unsupported formats, unreadable PDFs, malformed spreadsheets, missing required columns, blank reference tags, duplicate reference keys, suspicious reference values, stale mappings, DOCX placeholders, and low-searchability warnings show as readable messages.
 
 ## Profiles And Rules
 
@@ -54,18 +56,19 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 
 1. Open Findings Review after a completed run.
 2. Filter by severity, status, discipline, rule, sheet, RFI, and text.
-3. Select a finding and confirm details show issue ID, message, original generated text, edited text, evidence, matched text, sheet/page, output PDF page, coordinates, confidence, fingerprint, rule metadata, false-positive notes, and reviewer notes.
+3. Select a finding and confirm details show issue ID, message, original generated text, edited text, evidence, matched text, sheet/page, output PDF page, coordinates, confidence, fingerprint, rule metadata, false-positive notes, owner, RFI flag, and reviewer notes.
 4. Confirm the detail panel says the finding is a deterministic draft finding, not an engineering approval.
 5. Confirm Rule Explanation shows rule ID/name, description, discipline, default severity, default confidence, required inputs, profiles, and false-positive notes.
-6. Confirm Finding Evidence shows why the item was flagged, matched text, context, sheet/page, fingerprint, and any linked reference source/row.
+6. Confirm Finding Evidence shows why the item was flagged, what the reviewer should do next, matched text, context, sheet/page, fingerprint, and any linked reference source/row.
 7. Confirm Decision History is empty before edits or shows prior status/comment/severity/discipline changes after edits.
 8. Accept one finding.
 9. Reject one finding.
 10. Edit the wording on one accepted finding.
 11. Change severity and discipline on one finding.
-12. Mark one finding as RFI candidate.
-13. Confirm changes persist after navigating away and back.
-14. Confirm Decision History lists each changed field with old value, new value, timestamp, and `local_user`.
+12. Assign an owner.
+13. Mark one finding as RFI candidate.
+14. Confirm changes persist after navigating away and back.
+15. Confirm Decision History lists each changed field with old value, new value, timestamp, and `local_user`.
 
 ## Packet Export
 
@@ -95,7 +98,7 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 1. Run the same sample project twice.
 2. Open Run History.
 3. Compare latest runs.
-4. Confirm new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and changed counts render.
+4. Confirm new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, backcheck-required, and changed counts render.
 5. Confirm issue IDs remain stable for matching fingerprints.
 
 ## Training
@@ -105,7 +108,7 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 3. Add a missed finding.
 4. Run regression.
 5. Confirm expected, actual, missing, new, changed, false-positive, and missed counts render.
-6. Confirm the per-rule performance table lists expected, actual, matched, missing, new, changed, false-positive, and missed counts.
+6. Confirm the per-rule performance table lists expected, actual, accepted, accepted rate, matched, missing, new, changed, false-positive, and missed counts.
 
 ## Settings
 

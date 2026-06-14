@@ -24,6 +24,8 @@ AutoReview is a local hybrid desktop system.
 
 The direct-PDF CLI follows the same service path by creating a transient local project in the requested output directory, ingesting the drawing/reference files, creating a persisted run, and calling the same review and packet services.
 
+Reference CSV/XLSX files are analyzed before a run through the same local API. The UI shows parsed headers, preview rows, inferred/saved/effective mappings, and validation messages, then saves reusable role-based mappings under `profiles/reference_mappings.json`.
+
 ## Shared Workflow Boundary
 
 The production MVP path is the persisted project workflow: desktop UI, FastAPI sidecar, SQLite project storage, Python worker, CLI direct-PDF runs, finding review, and packet export all operate through `ng_drawing_qa.services.review.run_project_review` and `ng_drawing_qa.services.packet.export_review_packet`.
@@ -37,6 +39,8 @@ Each persisted run writes `run_manifest.json` under `outputs/runs/{run_id}`. The
 Each completed review run also writes `finding_traceability.csv` beside `issue_log.csv`. This CSV is the low-friction audit surface for comparing UI/backend/worker/CLI runs because it records issue ID, fingerprint, rule, status, severity, sheet/page, found text, confidence, and source for each persisted finding.
 
 Finding reviewer changes are stored in SQLite `finding_decisions`. Each changed field records the finding ID, issue ID, run/project IDs, previous value, new value, timestamp, and local reviewer marker. The MVP is local single-user, so the reviewer marker is `local_user` until a future team workflow adds identity.
+
+Run comparison reports new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and backcheck-required findings so reviewers can check whether prior revision comments were resolved.
 
 ## Project Folder
 

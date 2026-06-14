@@ -23,14 +23,15 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - File ingestion, role inference, role editing, hashing, and project-local copies.
 - Validation for missing files, blank files, unsupported extensions, unreadable PDFs, low-searchability PDFs, malformed tables, missing required columns, blank reference tags, duplicate reference keys, suspicious reference values, bad saved mappings, and DOCX placeholders.
 - Reference analysis API and Input Files preview show inferred/saved/effective column mappings, required fields, row counts, parsed sample rows, and mapping warnings before running QA.
+- Input Files now includes an in-place mapping editor for CSV/XLSX references so users can save role-based mappings without leaving the desktop workflow.
 - Reusable role-based reference column mappings are stored locally under `profiles/reference_mappings.json` and included in profile export/import.
 - Review runs through an isolated Python worker.
 - Worker launch failures and expected worker-side errors are reported with friendly AutoReview messages instead of raw Python tracebacks.
 - Finding persistence with stable `AR-####` issue IDs and deterministic fingerprints.
 - Run manifests and `finding_traceability.csv` include compact issue ID/fingerprint traces for CLI-vs-persisted comparison and regression audits.
-- Reviewer updates for status, severity, discipline, edited message, RFI flag, and notes.
+- Reviewer updates for status, severity, discipline, owner, edited message, RFI flag, and notes.
 - Reviewer decision history is persisted for changed finding fields and exposed through the findings API/UI.
-- Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, and decision history.
+- Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, owner, RFI flag, reviewer action guidance, and decision history.
 - Packet export after reviewer decisions.
 - Packet export is blocked until the selected review run is completed.
 - Default packet scope excludes rejected findings and includes accepted edited comments.
@@ -39,8 +40,8 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Issue IDs in the packet front matter link to the related marked-up drawing page when the PDF viewer supports internal links.
 - Coordinate-backed drawing markups include visible `AR-####` labels on marked-up drawing pages.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
-- Run history and comparison show new, resolved, repeated, carryover, status-changed, severity-changed, and message-changed findings.
-- Training labels, missed findings, golden regression, and per-rule regression performance summaries.
+- Run history and comparison show new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and backcheck-required findings.
+- Training labels, missed findings, golden regression, and per-rule regression performance summaries with accepted count/rate.
 - Support exports including CSV, XLSX, Markdown, HTML, logs, and diagnostics.
 
 ## Verification Results
@@ -53,7 +54,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, categorized run comparison including backcheck-required findings, training labels, accepted-rate rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel, reference preview/mapping editor, and a mocked project-to-packet workflow through the local API surface.
 
 Sample project smoke:
 

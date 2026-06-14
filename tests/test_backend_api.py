@@ -131,7 +131,7 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     matching_second = next(item for item in second_findings if item["fingerprint"] == findings[0]["fingerprint"])
     second_patch = client.patch(
         f"/findings/{matching_second['id']}",
-        json={"severity": "Critical", "edited_message": "Changed comparison wording."},
+        json={"status": "Backcheck Required", "severity": "Critical", "edited_message": "Changed comparison wording."},
     )
     assert second_patch.status_code == 200
     comparison = client.get(f"/runs/{run_id}/compare/{second_run_id}")
@@ -143,6 +143,7 @@ def test_backend_api_project_file_run_finding_packet_and_training_flow(tmp_path:
     assert matching_second["issue_id"] in comparison_body["status_changed_issue_ids"]
     assert matching_second["issue_id"] in comparison_body["severity_changed_issue_ids"]
     assert matching_second["issue_id"] in comparison_body["message_changed_issue_ids"]
+    assert matching_second["issue_id"] in comparison_body["backcheck_required_issue_ids"]
     assert comparison_body["carryover_issue_ids"]
 
     exported = client.get(f"/projects/{project['id']}/profiles/export/balanced")

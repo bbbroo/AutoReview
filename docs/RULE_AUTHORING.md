@@ -33,10 +33,21 @@ Every finding should include:
 - context/evidence
 - confidence
 - coordinates when available
+- false-positive notes in metadata that tell reviewers when the rule is likely to be noisy
 
 ## Tests
 
-Add tests for normalization, reference parsing, rule output, false-positive suppression, and golden regression behavior.
+Add tests for normalization, reference parsing, rule output, evidence fields, false-positive suppression, packet wording where applicable, and golden regression behavior. For rules that can create noisy findings, add at least one labeled false-positive or suppression-oriented test fixture.
+
+## Reviewer Trust Requirements
+
+Before enabling a new deterministic natural gas rule by default, confirm:
+
+- the rule has metadata, required inputs, and false-positive notes
+- findings include enough evidence for the UI trust panel
+- profile controls can disable or tune the rule
+- golden regression covers expected findings and missed/false-positive examples
+- packet output uses edited reviewer wording and remains traceable by issue ID/fingerprint
 
 ## Profile Import And Export
 

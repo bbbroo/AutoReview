@@ -25,6 +25,8 @@ Export can include:
 
 The default is accepted findings only. Rejected findings are excluded unless the export explicitly enables rejected findings; the built-in full debug mode does this for troubleshooting.
 
+Backcheck mode uses the backcheck finding scope and is intended for unresolved findings, RFI candidates, needs-review findings, needs-more-information findings, and findings explicitly marked Backcheck Required.
+
 ## Packet Modes
 
 The export dialog records packet intent separately from the finding filter:
@@ -43,3 +45,5 @@ Generated packets include PDF bookmarks for the cover, issue index, critical/maj
 ## Traceability
 
 The same stable issue ID appears in the UI, SQLite, PDF markups, issue index, run manifest, `finding_traceability.csv`, and support exports. Reviewer-edited wording is used in the packet; original generated wording remains stored with the finding.
+
+Reference CSV/XLSX inputs are rendered into the packet when included, and the desktop reference mapping preview should be checked before export so reviewers can trust which columns drove list-based evidence.
