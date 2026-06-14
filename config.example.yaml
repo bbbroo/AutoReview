@@ -1,6 +1,6 @@
 project:
   name: Example Natural Gas QA Project
-  profile: regulator_station
+  profile: balanced
 
 outputs:
   timestamped_output_folder: true
@@ -37,6 +37,6 @@ rules:
     enabled: true
     severity: Minor
   AI_COMMENT_DRAFTS:
-    enabled: true
+    enabled: false
   SYMBOL_RECOGNITION_STUB:
-    enabled: true
+    enabled: false

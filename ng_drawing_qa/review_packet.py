@@ -7,6 +7,8 @@ import csv
 import math
 import re
 import html
+import zipfile
+import xml.etree.ElementTree as ET
 
 import fitz
 
@@ -284,12 +286,79 @@ def build_reference_pdf(references: dict[str, list[ReferenceRecord]], issues: li
     return doc
 
 
+def _docx_text(path: Path) -> str:
+    try:
+        with zipfile.ZipFile(path) as zf:
+            xml = zf.read("word/document.xml")
+        root = ET.fromstring(xml)
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        texts = [node.text or "" for node in root.findall(".//w:t", ns)]
+        return " ".join(texts)
+    except Exception:
+        return "DOCX text could not be extracted. Open the source file directly if this reference is needed."
+
+
+def _text_pages_from_content(title: str, content: str) -> fitz.Document:
+    doc = fitz.open()
+    lines: list[str] = []
+    for paragraph in re.split(r"\n{2,}", content or ""):
+        lines.extend(_wrap(paragraph, 112))
+        lines.append("")
+    if not lines:
+        lines = ["No text content was extracted."]
+    page = None
+    y = 0
+    for line in lines:
+        if page is None or y > PAGE_H - 48:
+            page = doc.new_page(width=PAGE_W, height=PAGE_H)
+            _draw_header(page, title, "Rendered text reference")
+            y = 78
+        page.insert_text((MARGIN, y), line[:180], fontsize=8)
+        y += 12
+    return doc
+
+
+def build_supplemental_reference_pdf(reference_files: list[Path]) -> fitz.Document:
+    doc = fitz.open()
+    for path in reference_files:
+        path = Path(path)
+        divider = doc.new_page(width=PAGE_W, height=PAGE_H)
+        _draw_header(divider, f"Reference File: {path.name}", "Supplemental reference evidence")
+        _add_note(
+            divider,
+            fitz.Rect(MARGIN, 88, PAGE_W - MARGIN, 142),
+            "This file was attached to the project as reference evidence. Structured CSV/XLSX references are rendered separately with issue-row highlighting when applicable.",
+            "Info",
+        )
+        _draw_footer(divider, "Supplemental reference input")
+        suffix = path.suffix.lower()
+        if suffix == ".pdf":
+            try:
+                ref_doc = fitz.open(path)
+                doc.insert_pdf(ref_doc)
+                ref_doc.close()
+            except Exception:
+                error_doc = _text_pages_from_content(path.name, f"PDF could not be rendered: {path}")
+                doc.insert_pdf(error_doc)
+                error_doc.close()
+        elif suffix == ".docx":
+            text_doc = _text_pages_from_content(path.name, _docx_text(path))
+            doc.insert_pdf(text_doc)
+            text_doc.close()
+        elif suffix == ".txt":
+            text_doc = _text_pages_from_content(path.name, path.read_text(encoding="utf-8", errors="replace"))
+            doc.insert_pdf(text_doc)
+            text_doc.close()
+    return doc
+
+
 def build_single_review_packet(
     annotated_doc: fitz.Document,
     issues: list[Issue],
     references: dict[str, list[ReferenceRecord]],
     out_path: Path,
     config: dict[str, Any],
+    supplemental_reference_files: list[Path] | None = None,
 ) -> None:
     """
     Create one single PDF containing:
@@ -320,6 +389,12 @@ def build_single_review_packet(
     packet.insert_pdf(ref_doc)
     ref_doc.close()
 
+    supplemental_reference_files = supplemental_reference_files or []
+    if supplemental_reference_files:
+        supplemental_doc = build_supplemental_reference_pdf(supplemental_reference_files)
+        packet.insert_pdf(supplemental_doc)
+        supplemental_doc.close()
+
     # Appendix / source map.
     page = packet.new_page(width=PAGE_W, height=PAGE_H)
     _draw_header(page, "Packet Source Map", "How to use this single PDF")
@@ -332,7 +407,7 @@ def build_single_review_packet(
         "All findings remain draft automated findings until accepted by a reviewer.",
     ]
     for b in bullets:
-        for line in _wrap("• " + b, 110):
+        for line in _wrap("- " + b, 110):
             page.insert_text((MARGIN, y), line, fontsize=10)
             y += 16
         y += 4

@@ -9,7 +9,7 @@ import yaml
 DEFAULT_CONFIG: dict[str, Any] = {
     "project": {
         "name": "Natural Gas Drawing QA",
-        "profile": "regulator_station",
+        "profile": "balanced",
         "timezone": "America/Chicago",
     },
     "outputs": {
@@ -157,8 +157,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "REPEATED_TAG_REVIEW": {"enabled": True, "severity": "Info", "discipline": "General", "confidence": 0.55},
         "COMMENT_QUALITY_SCORER": {"enabled": True, "severity": "Info", "discipline": "QA", "confidence": 0.65},
         "RFI_CANDIDATE_DETECTOR": {"enabled": True, "severity": "Major", "discipline": "Project Management", "confidence": 0.65},
-        "AI_COMMENT_DRAFTS": {"enabled": True, "severity": "Info", "discipline": "QA", "confidence": 0.50},
-        "SYMBOL_RECOGNITION_STUB": {"enabled": True, "severity": "Info", "discipline": "QA", "confidence": 0.40},
+        "AI_COMMENT_DRAFTS": {"enabled": False, "severity": "Info", "discipline": "QA", "confidence": 0.50},
+        "SYMBOL_RECOGNITION_STUB": {"enabled": False, "severity": "Info", "discipline": "QA", "confidence": 0.40},
         "ASSET_REGISTER_DRAFT": {"enabled": True, "severity": "Info", "discipline": "Operations", "confidence": 0.50},
     },
     "review": {
@@ -178,17 +178,64 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "suppress_repeated_findings_per_rule_page": 10,
     },
     "profiles": {
+        "balanced": {
+            "rules_on": [
+                "LOW_SEARCHABLE_TEXT", "RASTER_ONLY_PAGE", "GARBLED_OCR_TEXT",
+                "DRAWING_INDEX_RECONCILIATION", "TITLE_BLOCK_MISSING_FIELD",
+                "DUPLICATE_SHEET_NUMBER", "REVISION_MISMATCH", "SHEET_TITLE_MISMATCH",
+                "VALVE_TAG_RECONCILIATION", "LINE_NUMBER_RECONCILIATION",
+                "INSTRUMENT_TAG_RECONCILIATION", "EQUIPMENT_TAG_RECONCILIATION",
+                "PRESSURE_CONSISTENCY", "CODE_CONSISTENCY", "TEST_PRESSURE_CHECK",
+                "MATERIAL_SPEC_CHECK", "REGULATOR_STATION_CHECKLIST",
+                "RELIEF_VENT_CHECKLIST", "TIE_IN_CHECKLIST",
+                "DETAIL_REFERENCE_CHECK", "SECTION_REFERENCE_CHECK",
+                "RFI_CANDIDATE_DETECTOR", "ASSET_REGISTER_DRAFT"
+            ],
+            "rules_off": ["AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB", "REPEATED_TAG_REVIEW"],
+        },
+        "conservative": {
+            "rules_on": [
+                "LOW_SEARCHABLE_TEXT", "RASTER_ONLY_PAGE", "DRAWING_INDEX_RECONCILIATION",
+                "DUPLICATE_SHEET_NUMBER", "REVISION_MISMATCH",
+                "VALVE_TAG_RECONCILIATION", "LINE_NUMBER_RECONCILIATION",
+                "INSTRUMENT_TAG_RECONCILIATION", "EQUIPMENT_TAG_RECONCILIATION",
+                "PRESSURE_CONSISTENCY", "CODE_CONSISTENCY", "DETAIL_REFERENCE_CHECK",
+                "RFI_CANDIDATE_DETECTOR", "ASSET_REGISTER_DRAFT"
+            ],
+            "rules_off": [
+                "AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB", "REPEATED_TAG_REVIEW",
+                "TITLE_BLOCK_MISSING_FIELD", "SHEET_TITLE_MISMATCH",
+                "MATERIAL_SPEC_CHECK", "COATING_NOTE_CHECK",
+                "REGULATOR_STATION_CHECKLIST", "RELIEF_VENT_CHECKLIST",
+                "TIE_IN_CHECKLIST", "SECTION_REFERENCE_CHECK"
+            ],
+        },
+        "aggressive": {
+            "rules_on": [
+                "LOW_SEARCHABLE_TEXT", "RASTER_ONLY_PAGE", "GARBLED_OCR_TEXT",
+                "DRAWING_INDEX_RECONCILIATION", "TITLE_BLOCK_MISSING_FIELD",
+                "DUPLICATE_SHEET_NUMBER", "REVISION_MISMATCH", "SHEET_TITLE_MISMATCH",
+                "VALVE_TAG_RECONCILIATION", "LINE_NUMBER_RECONCILIATION",
+                "INSTRUMENT_TAG_RECONCILIATION", "EQUIPMENT_TAG_RECONCILIATION",
+                "PRESSURE_CONSISTENCY", "CODE_CONSISTENCY", "TEST_PRESSURE_CHECK",
+                "MATERIAL_SPEC_CHECK", "COATING_NOTE_CHECK",
+                "REGULATOR_STATION_CHECKLIST", "RELIEF_VENT_CHECKLIST",
+                "TIE_IN_CHECKLIST", "DETAIL_REFERENCE_CHECK", "SECTION_REFERENCE_CHECK",
+                "REPEATED_TAG_REVIEW", "RFI_CANDIDATE_DETECTOR", "ASSET_REGISTER_DRAFT"
+            ],
+            "rules_off": ["AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB"],
+        },
         "regulator_station": {
             "rules_on": ["REGULATOR_STATION_CHECKLIST", "RELIEF_VENT_CHECKLIST", "VALVE_TAG_RECONCILIATION", "INSTRUMENT_TAG_RECONCILIATION"],
-            "rules_off": [],
+            "rules_off": ["AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB"],
         },
         "pipeline_crossing": {
             "rules_on": ["LINE_NUMBER_RECONCILIATION", "DETAIL_REFERENCE_CHECK", "MATERIAL_SPEC_CHECK", "COATING_NOTE_CHECK"],
-            "rules_off": ["REGULATOR_STATION_CHECKLIST"],
+            "rules_off": ["REGULATOR_STATION_CHECKLIST", "AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB"],
         },
         "p_and_id": {
             "rules_on": ["VALVE_TAG_RECONCILIATION", "INSTRUMENT_TAG_RECONCILIATION", "PRESSURE_CONSISTENCY"],
-            "rules_off": [],
+            "rules_off": ["AI_COMMENT_DRAFTS", "SYMBOL_RECOGNITION_STUB"],
         },
     },
     "integrations": {

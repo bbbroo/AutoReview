@@ -20,6 +20,7 @@ from .annotations import annotate_pdf
 from .reports import write_all_reports
 from .review_packet import build_single_review_packet
 from .sample import generate_sample_project
+from .rules.registry import get_rule_metadata
 
 
 def timestamp() -> str:
@@ -167,7 +168,7 @@ def main(argv=None):
     parser.add_argument("input_pdf", nargs="?", help="Input PDF drawing set")
     parser.add_argument("--out-dir", default="ngqa_outputs", help="Output directory")
     parser.add_argument("--config", help="YAML config file")
-    parser.add_argument("--profile", choices=["regulator_station", "pipeline_crossing", "p_and_id"], help="Rule profile")
+    parser.add_argument("--profile", choices=["balanced", "conservative", "aggressive", "regulator_station", "pipeline_crossing", "p_and_id"], help="Rule profile")
     parser.add_argument("--dry-run", action="store_true", help="Generate reports only, no marked-up PDF")
     parser.add_argument("--batch-folder", help="Process every PDF in this folder")
     parser.add_argument("--export-text", action="store_true", help="Export extracted text per page")
@@ -184,8 +185,15 @@ def main(argv=None):
     parser.add_argument("--write-default-config", help="Write default YAML config to this path and exit")
     parser.add_argument("--create-project-template", help="Create a reusable project template folder and exit")
     parser.add_argument("--generate-sample", help="Generate a sample PDF and reference files in this folder and exit")
+    parser.add_argument("--list-rules", action="store_true", help="List deterministic rule metadata and exit")
 
     args = parser.parse_args(argv)
+
+    if args.list_rules:
+        for rule in get_rule_metadata():
+            state = "default-on" if rule.enabled_by_default else "default-off"
+            print(f"{rule.rule_id}: {rule.name} [{rule.default_severity.value}, {rule.discipline}, {state}]")
+        return 0
 
     if args.write_default_config:
         save_default_config(args.write_default_config)
@@ -220,8 +228,18 @@ def main(argv=None):
     if not args.input_pdf:
         parser.error("input_pdf is required unless using --batch-folder, --generate-sample, --write-default-config, or --create-project-template")
 
-    process_one_pdf(Path(args.input_pdf), args, config)
-    return 0
+    try:
+        process_one_pdf(Path(args.input_pdf), args, config)
+        return 0
+    except FileNotFoundError as exc:
+        print(f"Input error: file not found: {exc}")
+        return 2
+    except ValueError as exc:
+        print(f"Input error: {exc}")
+        return 2
+    except RuntimeError as exc:
+        print(f"Run error: {exc}")
+        return 3
 
 
 if __name__ == "__main__":
