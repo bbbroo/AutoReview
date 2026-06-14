@@ -22,11 +22,13 @@ AutoReview is a local hybrid desktop system.
 8. The reviewer edits and classifies findings in the UI.
 9. Packet export rebuilds markups from stored reviewer-approved findings.
 
+The direct-PDF CLI follows the same service path by creating a transient local project in the requested output directory, ingesting the drawing/reference files, creating a persisted run, and calling the same review and packet services.
+
 ## Shared Workflow Boundary
 
-The production MVP path is the persisted project workflow: desktop UI, FastAPI sidecar, SQLite project storage, Python worker, finding review, and packet export all operate through `ng_drawing_qa.services.review.run_project_review` and `ng_drawing_qa.services.packet.export_review_packet`.
+The production MVP path is the persisted project workflow: desktop UI, FastAPI sidecar, SQLite project storage, Python worker, CLI direct-PDF runs, finding review, and packet export all operate through `ng_drawing_qa.services.review.run_project_review` and `ng_drawing_qa.services.packet.export_review_packet`.
 
-The legacy direct-PDF CLI remains available for engineers who need terminal output. It shares the same extraction utilities, deterministic rule registry, report writers, annotation code, and packet builder, but its `process_one_pdf` orchestration is still separate. Treat that as a known refactor target before broad production rollout.
+This keeps rule execution, finding creation, issue IDs, fingerprints, run manifests, packet filtering, edited wording, and support outputs aligned across UI, backend, worker, and CLI entry points.
 
 ## Diagnostics
 

@@ -3,24 +3,20 @@ from __future__ import annotations
 from pathlib import Path
 import argparse
 import time
-import shutil
 import json
-from collections import Counter
 
-import fitz
+import yaml
 
 from .config import load_config, save_default_config
-from .models import RunManifest
-from .reference import load_reference_records, load_aliases, load_ignore_patterns, validate_reference_records
-from .pdf_utils import extract_page_info, extract_word_hits, export_extracted_text, export_words_csv
-from .issue_builder import IssueBuilder
-from .rules.base import RuleContext
-from .rules.core_rules import run_all_rules
-from .annotations import annotate_pdf
-from .reports import write_all_reports
-from .review_packet import build_single_review_packet
+from .errors import AutoReviewError
 from .sample import generate_sample_project
 from .rules.registry import get_rule_metadata
+from .schemas import FileRole, PacketExportSettings, PacketFindingScope, ProjectCreate
+from .services.files import ingest_file
+from .services.packet import export_review_packet
+from .services.projects import create_project
+from .services.review import run_project_review
+from .storage.sqlite import AppIndex, ProjectRepository
 
 
 def timestamp() -> str:
@@ -35,111 +31,97 @@ def build_out_dir(base: str | Path, config: dict, input_pdf: Path | None = None)
     return base
 
 
-def load_references(config: dict, overrides: dict[str, str | None]) -> dict:
-    ref_cfg = dict(config.get("reference_files", {}))
-    ref_cfg.update({k: v for k, v in overrides.items() if v})
-    maps = config.get("column_mapping", {})
-    refs = {
-        "drawing_index": load_reference_records(ref_cfg.get("drawing_index"), "drawing_index", maps.get("drawing_index", {}), config) if ref_cfg.get("drawing_index") else [],
-        "valve_list": load_reference_records(ref_cfg.get("valve_list"), "valve_list", maps.get("valve_list", {}), config) if ref_cfg.get("valve_list") else [],
-        "line_list": load_reference_records(ref_cfg.get("line_list"), "line_list", maps.get("line_list", {}), config) if ref_cfg.get("line_list") else [],
-        "instrument_index": load_reference_records(ref_cfg.get("instrument_index"), "instrument_index", maps.get("instrument_index", {}), config) if ref_cfg.get("instrument_index") else [],
-        "equipment_list": load_reference_records(ref_cfg.get("equipment_list"), "equipment_list", maps.get("equipment_list", {}), config) if ref_cfg.get("equipment_list") else [],
-    }
-    return refs
+CLI_REFERENCE_ROLES: dict[str, FileRole] = {
+    "drawing_index": FileRole.DRAWING_INDEX,
+    "valve_list": FileRole.VALVE_LIST,
+    "line_list": FileRole.LINE_LIST,
+    "instrument_index": FileRole.INSTRUMENT_INDEX,
+    "equipment_list": FileRole.EQUIPMENT_LIST,
+    "alias_table": FileRole.ALIAS_TABLE,
+    "ignore_patterns": FileRole.IGNORE_PATTERNS,
+}
+
+
+def _write_cli_config(out_dir: Path, args, config: dict) -> Path:
+    cli_config = json.loads(json.dumps(config))
+    outputs = cli_config.setdefault("outputs", {})
+    if args.dry_run:
+        outputs["dry_run"] = True
+    if args.export_text:
+        outputs["export_text"] = True
+    if args.export_words:
+        outputs["export_words"] = True
+    config_path = out_dir / "profiles" / "cli_run_config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(yaml.safe_dump(cli_config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return config_path
+
+
+def _cli_reference_paths(args) -> dict[str, Path]:
+    paths: dict[str, Path] = {}
+    for attr in CLI_REFERENCE_ROLES:
+        value = getattr(args, attr, None)
+        if value:
+            paths[attr] = Path(value)
+    return paths
+
+
+def _print_packet_result(repo: ProjectRepository, run_id: str, packet_name: str) -> None:
+    run = repo.get_run(run_id)
+    if run is None:
+        return
+    manifest_path = run.output_dir / "run_manifest.json"
+    packet_path = ""
+    marked_path = ""
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            packet_path = manifest.get("output_packet_path", "")
+            marked_path = manifest.get("marked_up_pdf_path", "")
+        except Exception:
+            pass
+    if marked_path:
+        print(f"Annotated PDF: {marked_path}")
+    if packet_path:
+        print(f"Single review packet PDF: {packet_path}")
+    elif packet_name:
+        print("Single review packet PDF: not generated.")
 
 
 def process_one_pdf(input_pdf: Path, args, config: dict, batch_out_dir: Path | None = None) -> Path:
-    started = time.monotonic()
     out_dir = batch_out_dir or build_out_dir(args.out_dir, config, input_pdf)
     out_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir = out_dir / "logs"
-    logs_dir.mkdir(exist_ok=True)
-    log_path = logs_dir / f"run_{timestamp()}.log"
+    print(f"Opening PDF: {input_pdf}")
+    app_index = AppIndex(out_dir / "app_index.sqlite")
+    project = create_project(ProjectCreate(name=out_dir.name, root_path=out_dir), app_index)
+    repo = ProjectRepository(project.database_path)
+    ingest_file(repo, project.id, project.root_path, input_pdf, role=FileRole.DRAWING_SET, copy_into_project=True)
+    for attr, path in _cli_reference_paths(args).items():
+        ingest_file(repo, project.id, project.root_path, path, role=CLI_REFERENCE_ROLES[attr], copy_into_project=True)
 
-    warnings = []
-    manifest = RunManifest(
-        input=str(input_pdf),
-        output_dir=str(out_dir),
-        started_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
-        settings_used=config,
-        warnings=warnings,
-    )
+    config_path = _write_cli_config(project.root_path, args, config)
+    run = repo.create_run(project.id, config.get("project", {}).get("profile", args.profile or "balanced"), project.root_path)
+    run_project_review(project.database_path, project.id, run.id, run.profile, config_path=config_path)
+    completed = repo.get_run(run.id)
+    findings = repo.list_findings(run.id)
+    print(f"Draft issues: {len(findings)}")
+    print(f"Output directory: {project.root_path}")
 
-    with log_path.open("w", encoding="utf-8") as log:
-        def log_line(msg: str):
-            print(msg)
-            log.write(msg + "\n")
-            log.flush()
-
-        log_line(f"Opening PDF: {input_pdf}")
-        doc = fitz.open(input_pdf)
-        page_infos, page_texts = extract_page_info(doc, config)
-
-        alias_path = args.alias_table or config.get("normalization", {}).get("alias_table")
-        ignore_path = args.ignore_patterns or config.get("normalization", {}).get("ignore_patterns")
-        aliases = load_aliases(alias_path, config)
-        ignore_patterns = load_ignore_patterns(ignore_path)
-
-        refs = load_references(config, {
-            "drawing_index": args.drawing_index,
-            "valve_list": args.valve_list,
-            "line_list": args.line_list,
-            "instrument_index": args.instrument_index,
-            "equipment_list": args.equipment_list,
-        })
-        for group in refs.values():
-            warnings.extend(validate_reference_records(group))
-
-        hits = extract_word_hits(doc, page_infos, page_texts, config, aliases=aliases, ignore_patterns=ignore_patterns)
-
-        if args.export_text or config.get("outputs", {}).get("export_text", False):
-            export_extracted_text(out_dir, page_infos, page_texts)
-        if args.export_words or config.get("outputs", {}).get("export_words", False):
-            export_words_csv(out_dir / "word_coordinates_debug.csv", doc, page_infos)
-
-        issue_builder = IssueBuilder(config)
-        ctx = RuleContext(
-            config=config,
-            issue_builder=issue_builder,
-            page_infos=page_infos,
-            page_texts=page_texts,
-            hits=hits,
-            references=refs,
-            run_warnings=warnings,
+    outputs = config.get("outputs", {})
+    if args.dry_run or outputs.get("dry_run", False):
+        print("Dry run: PDF annotations and packet export skipped.")
+    elif outputs.get("single_review_packet_pdf", True):
+        packet_name = outputs.get("single_review_packet_name", "single_review_packet.pdf")
+        export_review_packet(
+            project.database_path,
+            run.id,
+            PacketExportSettings(finding_scope=PacketFindingScope.ALL, include_reference_inputs=True, packet_name=packet_name),
         )
-        issues = run_all_rules(ctx)
-
-        manifest.rule_counts = dict(Counter(i.rule_id for i in issues))
-        manifest.severity_counts = dict(Counter(i.severity for i in issues))
-        manifest.complete(started, doc.page_count, len(issues))
-
-        log_line(f"Draft issues: {len(issues)}")
-        log_line(f"Output directory: {out_dir}")
-
-        if args.dry_run:
-            config.setdefault("outputs", {})["dry_run"] = True
-
-        if not config.get("outputs", {}).get("dry_run", False):
-            annotate_pdf(doc, issues, config)
-            output_pdf = out_dir / f"{input_pdf.stem}_marked_up.pdf"
-            doc.save(output_pdf, garbage=4, deflate=True)
-            log_line(f"Annotated PDF: {output_pdf}")
-
-            if config.get("outputs", {}).get("single_review_packet_pdf", True):
-                packet_name = config.get("outputs", {}).get("single_review_packet_name", "single_review_packet.pdf")
-                packet_path = out_dir / packet_name
-                build_single_review_packet(doc, issues, refs, packet_path, config)
-                log_line(f"Single review packet PDF: {packet_path}")
-        else:
-            log_line("Dry run: PDF annotations skipped.")
-            if config.get("outputs", {}).get("single_review_packet_pdf", True):
-                log_line("Dry run: single review packet skipped because the marked-up PDF was not generated.")
-
-        doc.close()
-        write_all_reports(out_dir, issues, page_infos, hits, manifest, config)
-        log_line("Reports written.")
-
+        _print_packet_result(repo, run.id, packet_name)
+    else:
+        print("Single review packet PDF: disabled by configuration.")
+    if completed and completed.status.value == "completed":
+        print("Reports written.")
     return out_dir
 
 
@@ -231,6 +213,9 @@ def main(argv=None):
     try:
         process_one_pdf(Path(args.input_pdf), args, config)
         return 0
+    except AutoReviewError as exc:
+        print(f"{exc.code}: {exc.message}")
+        return 2
     except FileNotFoundError as exc:
         print(f"Input error: file not found: {exc}")
         return 2

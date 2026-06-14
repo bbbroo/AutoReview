@@ -52,7 +52,7 @@ Generate sample inputs:
 
 ## CLI
 
-The original CLI remains available:
+The CLI remains available and uses the same persisted review workflow as the desktop app. Direct PDF runs create a local project-shaped output folder containing `project.sqlite`, copied inputs, support reports, marked-up PDF output, and the packet under `packets/`.
 
 ```powershell
 python -m ng_drawing_qa.cli input.pdf --out-dir outputs

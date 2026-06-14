@@ -14,7 +14,7 @@ The primary production workflow uses one persisted path:
 4. Findings are persisted with stable fingerprints and project-level issue IDs.
 5. Packet export calls `ng_drawing_qa.services.packet.export_review_packet` after reviewer decisions.
 
-The legacy direct-PDF CLI remains available and shares extraction, reference loading, deterministic rules, annotation, reports, and packet builders. Its `process_one_pdf` orchestration is still separate from the persisted project workflow and should be collapsed into the same service contract in the next hardening phase.
+The direct-PDF CLI remains available for terminal workflows. It now creates a transient local project in the requested output folder, ingests files through the same file service, runs `run_project_review`, persists findings with the same issue IDs and fingerprints, and exports packets through `export_review_packet`.
 
 ## What Works
 
@@ -27,6 +27,7 @@ The legacy direct-PDF CLI remains available and shares extraction, reference loa
 - Reviewer updates for status, severity, discipline, edited message, RFI flag, and notes.
 - Packet export after reviewer decisions.
 - Default packet scope excludes rejected findings and includes accepted edited comments.
+- CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
 - Run history, run comparison, training labels, missed findings, and golden regression foundation.
 - Support exports including CSV, XLSX, Markdown, HTML, logs, and diagnostics.
 
@@ -40,7 +41,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, packet export, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, and fingerprint stability.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, run creation, finding persistence, finding updates, packet export, run comparison, training labels, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency.
 
 Sample project smoke:
 
@@ -65,12 +66,12 @@ Private real-PDF smoke:
 
 ## Current Gaps
 
-- The legacy direct-PDF CLI still has separate orchestration from the persisted project workflow.
 - The desktop UI does not yet have automated visual regression coverage.
 - DOCX support is text extraction only, not print-fidelity rendering.
 - Reference PDFs are preserved/rendered, but structured reconciliation still depends on CSV/XLSX columns.
 - Title block extraction uses numeric configured regions and needs per-company tuning.
 - Large real drawings can generate noisy duplicate-sheet or low-searchability findings that need profile tuning.
+- CLI output now includes a transient project structure (`project.sqlite`, `inputs`, `profiles`, `packets`) inside the requested output folder rather than only loose report files.
 - Electron packaging, installer, updater, signing, and release process are documented but not implemented.
 - No enterprise auth, licensing, cloud sync, or tenant model is implemented by design.
 
@@ -79,7 +80,7 @@ Private real-PDF smoke:
 - PDF text quality and OCR variability on scanned or mixed raster/vector drawings.
 - Company-specific title block regions and sheet-number conventions.
 - False positives in duplicate sheet and reference/callout checks on real project drawing sets.
-- Legacy CLI orchestration drift from the persisted worker workflow.
+- CLI and UI now share the persisted workflow, but the terminal output folder layout changed and should be verified with internal users.
 - Electron/Vite/Vitest audit findings that require major dependency upgrade testing.
 
 ## npm Audit Triage
@@ -109,8 +110,8 @@ local_test_inputs/
 
 ## Next Development Phase
 
-1. Collapse the legacy CLI orchestration into the persisted review service or a shared lower-level workflow contract.
-2. Add automated UI/e2e tests around project setup, file selection, run status, findings edits, filters, and packet export.
-3. Add company-specific profile tuning from labeled real examples.
-4. Broaden golden regression sets with synthetic regulator station, P&ID, and drawing-index mismatch cases.
+1. Add automated UI/e2e tests around project setup, file selection, run status, findings edits, filters, and packet export.
+2. Add company-specific profile tuning from labeled real examples.
+3. Broaden golden regression sets with synthetic regulator station, P&ID, and drawing-index mismatch cases.
+4. Improve finding evidence display and rule explanation panels in the UI.
 5. Plan Electron/Vite/Vitest/Electron major dependency upgrades in a controlled compatibility branch.

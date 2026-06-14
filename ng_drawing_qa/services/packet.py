@@ -9,10 +9,9 @@ import fitz
 from ..annotations import annotate_pdf
 from ..config import load_config
 from ..errors import MissingInputError, ValidationError
-from ..models import Issue
+from ..models import Issue, RunManifest
 from ..review_packet import build_single_review_packet
 from ..reports import write_manifest
-from ..models import RunManifest
 from ..schemas import (
     FileRecord,
     FileRole,
@@ -135,6 +134,19 @@ def _update_run_manifest_after_packet(
     write_manifest(run_output_dir, manifest)
 
 
+def _load_run_config(run_output_dir: Path, profile: str) -> dict:
+    manifest_path = run_output_dir / "run_manifest.json"
+    if manifest_path.exists():
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            settings = data.get("settings_used")
+            if isinstance(settings, dict) and settings:
+                return settings
+        except Exception:
+            pass
+    return load_config(profile=profile)
+
+
 def export_review_packet(
     project_db_path: Path,
     run_id: str,
@@ -160,7 +172,7 @@ def export_review_packet(
     findings = [finding for finding in all_findings if _finding_selected(finding, settings)]
     issues = [_issue_from_finding(finding) for finding in findings]
 
-    config = load_config(profile=run.profile)
+    config = _load_run_config(run.output_dir, run.profile)
     config.setdefault("outputs", {})["dry_run"] = False
     config.setdefault("outputs", {})["annotate_pdf"] = True
     config.setdefault("outputs", {})["insert_summary_page"] = False
