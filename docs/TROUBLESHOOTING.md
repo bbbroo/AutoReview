@@ -23,6 +23,12 @@ python -m pip install -r requirements.txt
 
 The UI should show a readable backend error instead of a Python traceback.
 
+## Review Worker Failed
+
+If a run fails, open Run Status or Run History first. The run record, progress events, and `outputs/runs/{run_id}/run_manifest.json` should contain the friendly failure message and recommended fix.
+
+Worker stderr logs under `logs/{run_id}.worker.err.log` should report concise AutoReview error codes such as `MISSING_INPUT` or `VALIDATION_ERROR`, not raw Python tracebacks, for expected user-fixable failures.
+
 ## Missing Or Unreadable Files
 
 If validation reports a missing file, re-add the file from its current location. If a copied project input was deleted manually, remove and re-ingest the file.

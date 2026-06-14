@@ -6,7 +6,9 @@ import fitz
 from fastapi.testclient import TestClient
 
 from apps.backend.autoreview_backend import main
+from apps.backend.autoreview_backend import worker
 from ng_drawing_qa.sample import generate_sample_project
+from ng_drawing_qa.schemas import RunStatus
 from ng_drawing_qa.services.review import run_project_review
 from ng_drawing_qa.storage.sqlite import AppIndex
 
@@ -180,3 +182,53 @@ def test_backend_api_open_project_returns_friendly_error(tmp_path: Path, monkeyp
     body = response.json()
     assert body["detail"]["code"] == "MISSING_INPUT"
     assert "project.sqlite" in body["detail"]["message"]
+
+
+def test_backend_api_worker_start_failure_marks_run_failed(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    project = _create_project(client, tmp_path)
+
+    def popen_fails(*_, **__):
+        raise OSError("python executable unavailable")
+
+    monkeypatch.setattr(main.subprocess, "Popen", popen_fails)
+    response = client.post(f"/projects/{project['id']}/runs", json={"profile": "balanced"})
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["detail"]["code"] == "REVIEW_RUN_FAILED"
+    assert "Could not start the local review worker" in body["detail"]["message"]
+
+    history = client.get(f"/projects/{project['id']}/history")
+    assert history.status_code == 200
+    runs = history.json()
+    assert len(runs) == 1
+    assert runs[0]["status"] == RunStatus.FAILED.value
+    assert "Could not start the local review worker" in runs[0]["error_message"]
+
+    run_detail = client.get(f"/runs/{runs[0]['id']}")
+    assert run_detail.status_code == 200
+    progress = run_detail.json()["progress"]
+    assert progress[-1]["level"] == "error"
+    assert "Could not start the local review worker" in progress[-1]["message"]
+
+
+def test_worker_reports_friendly_errors_without_tracebacks(tmp_path: Path, capsys):
+    exit_code = worker.main(
+        [
+            "run",
+            "--project-db",
+            str(tmp_path / "missing_project.sqlite"),
+            "--project-id",
+            "project_missing",
+            "--run-id",
+            "run_missing",
+            "--profile",
+            "balanced",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "MISSING_INPUT: Project not found: project_missing" in captured.err
+    assert "Traceback" not in captured.err
