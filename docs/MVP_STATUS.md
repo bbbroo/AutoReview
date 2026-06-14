@@ -34,6 +34,7 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Packet exports record mode (`internal_qa`, `client_review`, `backcheck`, or `full_debug`) separately from deterministic finding scope.
 - Packet PDFs include bookmarks for major sections and drawing-page finding clusters.
 - Issue IDs in the packet front matter link to the related marked-up drawing page when the PDF viewer supports internal links.
+- Coordinate-backed drawing markups include visible `AR-####` labels on marked-up drawing pages.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
 - Run history and comparison show new, resolved, repeated, carryover, status-changed, severity-changed, and message-changed findings.
 - Training labels, missed findings, golden regression, and per-rule regression performance summaries.
@@ -49,7 +50,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role assignment, reference analysis, saved reference mappings, malformed references, run creation, finding persistence, finding updates, reviewer decision history, packet export, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, categorized run comparison, training labels, rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel and reference preview surface.
 
 Sample project smoke:
 
@@ -58,7 +59,7 @@ Sample project smoke:
 - Accepted, edited, and rejected findings.
 - Exported a packet.
 - Confirmed issue index, priority list, marked-up drawings, rendered reference inputs, source map, stable issue IDs, edited accepted wording, and rejected finding exclusion.
-- Confirmed packet bookmarks and issue-index links on generated sample packets.
+- Confirmed packet bookmarks, issue-index links, and visible drawing-page issue-ID labels on generated sample packets.
 
 Private real-PDF smoke:
 

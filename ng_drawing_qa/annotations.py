@@ -17,6 +17,59 @@ def _rect(issue: Issue) -> fitz.Rect:
     return fitz.Rect(issue.x0, issue.y0, issue.x1, issue.y1)
 
 
+def _label_fill(color: tuple[float, float, float]) -> tuple[float, float, float]:
+    return tuple(min(1.0, 0.82 + channel * 0.18) for channel in color)
+
+
+def _issue_label_rect(page: fitz.Page, rect: fitz.Rect, text: str, fontsize: float) -> fitz.Rect:
+    width = min(max(46.0, len(text) * fontsize * 0.7 + 12.0), 120.0)
+    height = max(14.0, fontsize + 8.0)
+    x0 = min(max(0.0, rect.x0), max(0.0, page.rect.width - width))
+    if rect.y0 >= height + 4:
+        y0 = rect.y0 - height - 2
+    else:
+        y0 = min(page.rect.height - height, rect.y1 + 2)
+    y0 = max(0.0, y0)
+    return fitz.Rect(x0, y0, x0 + width, y0 + height)
+
+
+def add_issue_id_label(
+    page: fitz.Page,
+    rect: fitz.Rect,
+    issue: Issue,
+    config: dict[str, Any],
+    color: tuple[float, float, float],
+    content: str,
+) -> None:
+    ann_config = config.get("annotation", {})
+    if not ann_config.get("add_issue_id_labels", True):
+        return
+
+    try:
+        fontsize = float(ann_config.get("issue_id_label_font_size", 7))
+    except (TypeError, ValueError):
+        fontsize = 7.0
+
+    text = issue.issue_id
+    label_rect = _issue_label_rect(page, rect, text, fontsize)
+    try:
+        page.draw_rect(label_rect, color=color, fill=_label_fill(color), width=0.5, overlay=True)
+        label = page.add_freetext_annot(
+            label_rect,
+            text,
+            fontsize=fontsize,
+        )
+        label.set_border(width=0.5)
+        label.set_info(
+            title="Natural Gas QA",
+            subject=f"{issue.issue_id} - Issue ID Label",
+            content=content,
+        )
+        label.update()
+    except Exception:
+        pass
+
+
 def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -> None:
     if issue.page_number < 1 or issue.page_number > doc.page_count:
         return
@@ -49,6 +102,8 @@ def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -
         a.update()
     except Exception:
         pass
+
+    add_issue_id_label(page, rect, issue, config, color, content)
 
     try:
         note_x = min(page.rect.width - 16, rect.x1 + 8)

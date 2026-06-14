@@ -29,6 +29,10 @@ normalization:
 pdf:
   min_words_per_page: 20
 
+annotation:
+  add_issue_id_labels: true
+  issue_id_label_font_size: 7
+
 rules:
   MATERIAL_SPEC_CHECK:
     enabled: true

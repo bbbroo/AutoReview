@@ -276,6 +276,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "Info": [0.0, 0.35, 1.0],
         },
         "max_individual_markups_per_rule_page": 10,
+        "add_issue_id_labels": True,
+        "issue_id_label_font_size": 7,
         "add_sheet_summary_annotations": True,
     },
 }

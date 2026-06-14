@@ -38,7 +38,7 @@ The exact included findings are still controlled by the deterministic finding sc
 
 ## Navigation
 
-Generated packets include PDF bookmarks for the cover, issue index, critical/major list, marked-up drawing set, drawing-page finding clusters, rendered reference inputs, and source map. Issue IDs in the front matter are internal PDF links to the related marked-up drawing page when the viewer supports PDF links.
+Generated packets include PDF bookmarks for the cover, issue index, critical/major list, marked-up drawing set, drawing-page finding clusters, rendered reference inputs, and source map. Issue IDs in the front matter are internal PDF links to the related marked-up drawing page when the viewer supports PDF links. Coordinate-backed drawing markups also carry a small visible issue-ID label, such as `AR-0022`, near the highlighted evidence so the drawing page can be reconciled back to the issue index and UI.
 
 ## Traceability
 

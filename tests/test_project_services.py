@@ -76,14 +76,25 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert findings[0].evidence.reason
 
     assert len(findings) >= 4
-    repo.patch_finding(findings[0].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
-    repo.patch_finding(findings[1].id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
-    repo.patch_finding(findings[2].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Second accepted reviewer wording."))
-    reviewed = repo.get_finding(findings[0].id)
+    visual_findings = [finding for finding in findings if finding.x1 > finding.x0 and finding.y1 > finding.y0]
+    assert visual_findings
+    accepted_primary = visual_findings[0]
+    accepted_secondary = next(finding for finding in findings if finding.id != accepted_primary.id)
+    rejected_finding = next(finding for finding in findings if finding.id not in {accepted_primary.id, accepted_secondary.id})
+    backcheck_finding = next(
+        finding for finding in findings if finding.id not in {accepted_primary.id, accepted_secondary.id, rejected_finding.id}
+    )
+    repo.patch_finding(accepted_primary.id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
+    repo.patch_finding(rejected_finding.id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
+    repo.patch_finding(
+        accepted_secondary.id,
+        FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Second accepted reviewer wording."),
+    )
+    reviewed = repo.get_finding(accepted_primary.id)
     assert reviewed is not None
     assert {decision.field_name for decision in reviewed.decision_history} >= {"status", "edited_message"}
     assert any(decision.previous_value == "Draft" and decision.new_value == "Accepted" for decision in reviewed.decision_history)
-    assert reviewed.decision_history[0].issue_id == findings[0].issue_id
+    assert reviewed.decision_history[0].issue_id == accepted_primary.issue_id
     packet = export_review_packet(
         project.database_path,
         run.id,
@@ -93,26 +104,34 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert packet.packet_path.exists()
     with fitz.open(packet.packet_path) as packet_doc:
         packet_text = "\n".join(page.get_text() for page in packet_doc)
-        toc_titles = [item[1] for item in packet_doc.get_toc()]
+        toc = packet_doc.get_toc()
+        toc_titles = [item[1] for item in toc]
         front_links = [
             link
             for page_index in range(min(packet_doc.page_count, 4))
             for link in packet_doc[page_index].get_links()
         ]
+        drawing_divider_page_num = next(item[2] for item in toc if item[1] == "Marked-Up Drawing Set")
+        reference_divider_page_num = next(item[2] for item in toc if item[1] == "Rendered Reference Inputs")
+        drawing_label_subjects = []
+        for page_index in range(drawing_divider_page_num, reference_divider_page_num - 1):
+            annots = list(packet_doc[page_index].annots() or [])
+            drawing_label_subjects.extend((annot.info or {}).get("subject", "") for annot in annots)
     assert "Issue Index" in packet_text
     assert "Marked-Up Drawing Set" in packet_text
     assert "Rendered Reference Inputs" in packet_text
     assert "Packet Source Map" in packet_text
     assert "Reviewer-approved wording." in packet_text
-    assert findings[0].issue_id in packet_text
-    assert findings[1].issue_id not in packet_text
+    assert accepted_primary.issue_id in packet_text
+    assert rejected_finding.issue_id not in packet_text
     assert "Issue Index" in toc_titles
     assert "Marked-Up Drawing Set" in toc_titles
     assert "Rendered Reference Inputs" in toc_titles
     assert "Packet Source Map" in toc_titles
     assert any(link["kind"] == fitz.LINK_GOTO for link in front_links)
+    assert f"{accepted_primary.issue_id} - Issue ID Label" in drawing_label_subjects
 
-    repo.patch_finding(findings[3].id, FindingPatch(status=FindingStatus.BACKCHECK_REQUIRED, edited_message="Backcheck-required wording."))
+    repo.patch_finding(backcheck_finding.id, FindingPatch(status=FindingStatus.BACKCHECK_REQUIRED, edited_message="Backcheck-required wording."))
     backcheck_packet = export_review_packet(
         project.database_path,
         run.id,
@@ -127,7 +146,7 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
         backcheck_text = "\n".join(page.get_text() for page in packet_doc)
     assert "Backcheck-required wording." in backcheck_text
     assert "Reviewer-approved wording." not in backcheck_text
-    assert findings[1].issue_id not in backcheck_text
+    assert rejected_finding.issue_id not in backcheck_text
 
     manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
     assert manifest["run_id"] == run.id
