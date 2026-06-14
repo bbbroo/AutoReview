@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from ng_drawing_qa.config import load_config
-from ng_drawing_qa.errors import AutoReviewError
+from ng_drawing_qa.errors import AutoReviewError, ReviewRunError
 from ng_drawing_qa.rules.registry import get_rule_metadata
 from ng_drawing_qa.schemas import (
     FileIngestRequest,
@@ -29,6 +29,7 @@ from ng_drawing_qa.schemas import (
     RegressionResult,
     RunCreate,
     RunRecord,
+    RunStatus,
     TrainingLabelRecord,
     TrainingLabelRequest,
     TrainingSetCreate,
@@ -152,6 +153,12 @@ def _spawn_review_worker(project: ProjectRecord, run: RunRecord) -> None:
     stderr = stderr_path.open("a", encoding="utf-8")
     try:
         subprocess.Popen(args, cwd=Path.cwd(), stdout=stdout, stderr=stderr)
+    except OSError as exc:
+        repo = _repo(project)
+        message = f"Could not start the local review worker: {exc}. Confirm Python is installed and start the app from the repository root."
+        repo.update_run(run.id, status=RunStatus.FAILED, completed_at=None, error_message=message)
+        repo.add_progress(run.id, "worker", message, 100, level="error")
+        raise ReviewRunError(message) from exc
     finally:
         stdout.close()
         stderr.close()

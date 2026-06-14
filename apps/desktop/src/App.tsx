@@ -469,6 +469,20 @@ export default function App() {
                   </div>
                 </div>
                 <ProgressBar value={runPercent / 100} />
+                <div className="diagnostic-grid">
+                  <div><strong>Run ID</strong><span>{currentRun?.run.id ?? "none"}</span></div>
+                  <div><strong>Profile</strong><span>{currentRun?.run.profile ?? profile}</span></div>
+                  <div><strong>Output Folder</strong><span>{currentRun?.run.output_dir ?? "not created"}</span></div>
+                  <div><strong>Started</strong><span>{currentRun?.run.started_at ?? "not started"}</span></div>
+                  <div><strong>Completed</strong><span>{currentRun?.run.completed_at ?? "not completed"}</span></div>
+                  <div><strong>Warnings</strong><span>{currentRun?.run.warnings.length ?? 0}</span></div>
+                </div>
+                {currentRun?.run.error_message && <div className="error-callout">{currentRun.run.error_message}</div>}
+                {!!currentRun?.run.warnings.length && (
+                  <ul className="warning-list">
+                    {currentRun.run.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+                  </ul>
+                )}
                 <ol className="progress-list">
                   {currentRun?.progress.map((event) => (
                     <li key={event.id} className={event.level === "error" ? "error" : ""}>

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from ..errors import MissingInputError
 from ..schemas import ProjectCreate, ProjectRecord
 from ..storage.sqlite import AppIndex, ProjectRepository, new_id, now_iso
 
@@ -58,10 +59,12 @@ def create_project(request: ProjectCreate, app_index: AppIndex | None = None) ->
 def open_project(root_path: Path, app_index: AppIndex | None = None) -> ProjectRecord:
     root = Path(root_path)
     db_path = root / "project.sqlite"
+    if not db_path.exists():
+        raise MissingInputError(f"No AutoReview project.sqlite found in {root}. Select an existing AutoReview project folder or create a new project.")
     repo = ProjectRepository(db_path)
     project = repo.get_project()
     if project is None:
-        raise FileNotFoundError(f"No AutoReview project.sqlite found in {root}")
+        raise MissingInputError(f"No AutoReview project record found in {db_path}. Create a new project or choose a valid project folder.")
     (app_index or AppIndex()).upsert_project(project)
     return project
 

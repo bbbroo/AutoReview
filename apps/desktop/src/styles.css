@@ -697,6 +697,64 @@ select {
   text-transform: capitalize;
 }
 
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.diagnostic-grid div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dfe7f2;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.diagnostic-grid strong,
+.diagnostic-grid span {
+  display: block;
+}
+
+.diagnostic-grid strong {
+  margin-bottom: 5px;
+  color: #4e5a72;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.diagnostic-grid span {
+  color: #18223a;
+  overflow-wrap: anywhere;
+}
+
+.warning-list {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.warning-list li,
+.error-callout {
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.warning-list li {
+  color: #6b4b00;
+  background: #fff8e5;
+  border: 1px solid #f2cc60;
+}
+
+.error-callout {
+  color: #8b1a1a;
+  background: #fff1f1;
+  border: 1px solid #f3b6b6;
+}
+
 .progress-list {
   margin: 18px 0 0;
   padding-left: 20px;
@@ -938,7 +996,8 @@ select {
   .setup-grid,
   .findings-layout,
   .training-grid,
-  .settings-grid {
+  .settings-grid,
+  .diagnostic-grid {
     grid-template-columns: 1fr;
     overflow: auto;
   }

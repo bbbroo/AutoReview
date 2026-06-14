@@ -89,17 +89,35 @@ class RunManifest:
     input: str
     output_dir: str
     started_at: str
+    run_id: str = ""
+    project_id: str = ""
+    profile: str = ""
+    app_version: str = ""
+    engine_version: str = ""
+    status: str = "running"
     completed_at: str = ""
     elapsed_seconds: float = 0.0
     page_count: int = 0
     issue_count: int = 0
+    active_rule_count: int = 0
+    total_rule_count: int = 0
     rule_counts: dict[str, int] = field(default_factory=dict)
     severity_counts: dict[str, int] = field(default_factory=dict)
+    finding_status_counts: dict[str, int] = field(default_factory=dict)
+    input_files: list[dict[str, Any]] = field(default_factory=list)
+    output_files: list[dict[str, Any]] = field(default_factory=list)
+    output_packet_path: str = ""
+    marked_up_pdf_path: str = ""
+    packet_export_settings: dict[str, Any] = field(default_factory=dict)
+    packet_finding_count: int = 0
     settings_used: dict[str, Any] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    validation_warnings: list[str] = field(default_factory=list)
+    error_message: str = ""
 
     def complete(self, started_monotonic: float, page_count: int, issue_count: int) -> None:
         self.completed_at = time.strftime("%Y-%m-%dT%H:%M:%S")
         self.elapsed_seconds = round(time.monotonic() - started_monotonic, 3)
         self.page_count = page_count
         self.issue_count = issue_count
+        self.status = "completed"

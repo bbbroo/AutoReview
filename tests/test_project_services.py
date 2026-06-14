@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import fitz
+import pytest
+
+from ng_drawing_qa.errors import ValidationError
 from ng_drawing_qa.sample import generate_sample_project
 from ng_drawing_qa.schemas import (
     FileRole,
@@ -69,13 +74,71 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     assert findings[0].evidence.reason
 
     repo.patch_finding(findings[0].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Reviewer-approved wording."))
+    repo.patch_finding(findings[1].id, FindingPatch(status=FindingStatus.REJECTED, reviewer_notes="Rejected in regression test."))
+    repo.patch_finding(findings[2].id, FindingPatch(status=FindingStatus.ACCEPTED, edited_message="Second accepted reviewer wording."))
     packet = export_review_packet(
         project.database_path,
         run.id,
         PacketExportSettings(finding_scope=PacketFindingScope.ACCEPTED_ONLY),
     )
-    assert packet.finding_count == 1
+    assert packet.finding_count == 2
     assert packet.packet_path.exists()
+    with fitz.open(packet.packet_path) as packet_doc:
+        packet_text = "\n".join(page.get_text() for page in packet_doc)
+    assert "Issue Index" in packet_text
+    assert "Marked-Up Drawing Set" in packet_text
+    assert "Rendered Reference Inputs" in packet_text
+    assert "Packet Source Map" in packet_text
+    assert "Reviewer-approved wording." in packet_text
+    assert findings[0].issue_id in packet_text
+    assert findings[1].issue_id not in packet_text
+
+    manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["run_id"] == run.id
+    assert manifest["profile"] == "balanced"
+    assert manifest["input_files"]
+    assert manifest["input_files"][0]["sha256"]
+    assert manifest["packet_finding_count"] == 2
+    assert manifest["output_packet_path"] == str(packet.packet_path)
+    assert manifest["finding_status_counts"]["Accepted"] == 2
+    assert manifest["finding_status_counts"]["Rejected"] == 1
+
+
+def test_fingerprints_and_issue_ids_are_stable_across_repeated_runs(tmp_path: Path):
+    project, repo = _seed_sample_project(tmp_path)
+    run_one = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "run-one")
+    run_project_review(project.database_path, project.id, run_one.id, "balanced")
+    first = {finding.fingerprint: finding.issue_id for finding in repo.list_findings(run_one.id)}
+
+    run_two = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "run-two")
+    run_project_review(project.database_path, project.id, run_two.id, "balanced")
+    second = {finding.fingerprint: finding.issue_id for finding in repo.list_findings(run_two.id)}
+
+    assert first
+    assert first == second
+
+
+def test_validation_reports_user_fixable_file_errors(tmp_path: Path):
+    app_index = AppIndex(tmp_path / "app.sqlite")
+    project = create_project(ProjectCreate(name="Validation Test", root_path=tmp_path / "projects"), app_index)
+    repo = ProjectRepository(project.database_path)
+
+    with pytest.raises(ValidationError, match="could not be found"):
+        ingest_file(repo, project.id, project.root_path, tmp_path / "missing.pdf", role=FileRole.DRAWING_SET)
+
+    blank_pdf = tmp_path / "blank.pdf"
+    blank_pdf.write_bytes(b"")
+    blank = ingest_file(repo, project.id, project.root_path, blank_pdf, role=FileRole.DRAWING_SET)
+    issues = validate_project_inputs(repo.list_files(project.id))
+    assert any(issue.code == "BLANK_FILE" and issue.file_id == blank.id for issue in issues)
+
+    bad_valves = tmp_path / "valves.csv"
+    bad_valves.write_text("description\nmissing tag column\n", encoding="utf-8")
+    valves = ingest_file(repo, project.id, project.root_path, bad_valves, role=FileRole.VALVE_LIST)
+    issues = validate_project_inputs(repo.list_files(project.id))
+    missing_columns = [issue for issue in issues if issue.code == "MISSING_REQUIRED_COLUMNS" and issue.file_id == valves.id]
+    assert missing_columns
+    assert missing_columns[0].details["missing"] == ["tag"]
 
 
 def test_training_set_labels_and_golden_regression(tmp_path: Path):

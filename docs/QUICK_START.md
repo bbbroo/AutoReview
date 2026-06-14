@@ -27,3 +27,15 @@ Create a project, add a drawing set PDF, add optional CSV/XLSX reference files, 
 ## Real Drawing Sets
 
 Use real client/company drawings only as local project inputs or local training inputs. Do not commit proprietary PDFs.
+
+Private smoke inputs should go under the ignored folder:
+
+```powershell
+New-Item -ItemType Directory -Force local_test_inputs
+```
+
+Then create a project in the UI or through tests using files from that folder. Keep notes about false positives, OCR issues, title block issues, and performance in local-only files.
+
+## Manual UI QA
+
+Before a handoff, run the checklist in [Desktop UI QA Checklist](UI_QA_CHECKLIST.md).

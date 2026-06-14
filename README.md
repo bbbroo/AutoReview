@@ -14,6 +14,8 @@ The product output is one single-source review packet PDF: cover, review disclai
 - Deterministic rules with metadata for UI display.
 - Golden training set foundation for false positives, missed findings, and regression checks.
 
+See [Current MVP Status](docs/MVP_STATUS.md) for the latest verified architecture, known gaps, audit triage, and real-PDF smoke notes.
+
 ## Quick Start
 
 ```powershell
@@ -65,7 +67,9 @@ AutoReview does not require cloud storage, authentication, external APIs, Bluebe
 ## Documentation
 
 - [Quick Start](docs/QUICK_START.md)
+- [Current MVP Status](docs/MVP_STATUS.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Desktop UI QA Checklist](docs/UI_QA_CHECKLIST.md)
 - [Rule Authoring](docs/RULE_AUTHORING.md)
 - [Training Sets](docs/TRAINING_SETS.md)
 - [Review Packet](docs/REVIEW_PACKET.md)

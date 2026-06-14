@@ -97,19 +97,19 @@ def write_summary_reports(out_dir: Path, issues: list[Issue], page_infos: list[P
 
 
 def write_reference_reports(out_dir: Path, issues: list[Issue]) -> None:
-    missing = []
-    extra = []
-    dangling = []
+    missing: list[Issue] = []
+    extra: list[Issue] = []
+    dangling: list[Issue] = []
     for i in issues:
         if "listed but not found" in i.subject.lower():
-            missing.append(i.to_dict())
+            missing.append(i)
         if "not in reference" in i.subject.lower():
-            extra.append(i.to_dict())
+            extra.append(i)
         if "reference target sheet not found" in i.subject.lower():
-            dangling.append(i.to_dict())
-    write_csv(out_dir / "reference_only_missing_items.csv", missing, ISSUE_FIELDS)
-    write_csv(out_dir / "drawing_only_extra_items.csv", extra, ISSUE_FIELDS)
-    write_csv(out_dir / "dangling_callout_report.csv", dangling, ISSUE_FIELDS)
+            dangling.append(i)
+    write_csv(out_dir / "reference_only_missing_items.csv", [i.to_dict() for i in missing], ISSUE_FIELDS)
+    write_csv(out_dir / "drawing_only_extra_items.csv", [i.to_dict() for i in extra], ISSUE_FIELDS)
+    write_csv(out_dir / "dangling_callout_report.csv", [i.to_dict() for i in dangling], ISSUE_FIELDS)
     write_csv(out_dir / "hyperlink_suggestions.csv", [
         {
             "source_sheet": i.sheet_number,

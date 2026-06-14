@@ -9,13 +9,14 @@ from typing import Any
 
 import fitz
 
+from .. import __version__ as ENGINE_VERSION
 from ..config import load_config
 from ..errors import MissingInputError, ReviewRunError, ValidationError
 from ..issue_builder import IssueBuilder
 from ..models import Issue, RunManifest
 from ..pdf_utils import extract_page_info, extract_word_hits, export_extracted_text, export_words_csv
 from ..reference import load_aliases, load_ignore_patterns, load_reference_records, validate_reference_records
-from ..reports import write_all_reports
+from ..reports import write_all_reports, write_manifest
 from ..rules.base import RuleContext
 from ..rules.core_rules import run_all_rules
 from ..rules.registry import RULE_METADATA_BY_ID
@@ -31,6 +32,8 @@ REFERENCE_ROLE_TO_CONFIG_KEY: dict[FileRole, str] = {
     FileRole.INSTRUMENT_INDEX: "instrument_index",
     FileRole.EQUIPMENT_LIST: "equipment_list",
 }
+
+APP_VERSION = "0.3.0"
 
 
 def _severity(value: str) -> Severity:
@@ -137,6 +140,41 @@ def _reference_overrides(files: list[FileRecord]) -> dict[str, str]:
     return overrides
 
 
+def _manifest_file(record: FileRecord) -> dict[str, Any]:
+    return {
+        "id": record.id,
+        "role": record.role.value,
+        "file_name": record.file_name,
+        "original_path": str(record.original_path),
+        "local_path": str(record.local_path),
+        "extension": record.extension,
+        "size_bytes": record.size_bytes,
+        "sha256": record.sha256,
+        "warnings": record.warnings,
+    }
+
+
+def _manifest_outputs(out_dir: Path) -> list[dict[str, Any]]:
+    outputs: list[dict[str, Any]] = []
+    if not out_dir.exists():
+        return outputs
+    for path in sorted(item for item in out_dir.iterdir() if item.is_file()):
+        try:
+            outputs.append({
+                "path": str(path),
+                "file_name": path.name,
+                "extension": path.suffix.lower(),
+                "size_bytes": path.stat().st_size,
+            })
+        except OSError:
+            outputs.append({"path": str(path), "file_name": path.name, "extension": path.suffix.lower()})
+    return outputs
+
+
+def _active_rule_count(config: dict[str, Any]) -> int:
+    return sum(1 for rule in config.get("rules", {}).values() if bool(rule.get("enabled", True)))
+
+
 def load_project_references(config: dict[str, Any], overrides: dict[str, str]) -> dict:
     ref_cfg = dict(config.get("reference_files", {}))
     for key in REFERENCE_ROLE_TO_CONFIG_KEY.values():
@@ -238,15 +276,27 @@ def run_project_review(
             input=str(drawing.local_path),
             output_dir=str(out_dir),
             started_at=repo.get_run(run_id).started_at or now_iso(),
+            run_id=run_id,
+            project_id=project_id,
+            profile=profile,
+            app_version=APP_VERSION,
+            engine_version=ENGINE_VERSION,
+            active_rule_count=_active_rule_count(config),
+            total_rule_count=len(config.get("rules", {})),
+            input_files=[_manifest_file(file) for file in files],
             settings_used=config,
             warnings=warnings,
+            validation_warnings=list(warnings),
         )
         manifest.rule_counts = dict(Counter(i.rule_id for i in issues))
         manifest.severity_counts = dict(Counter(i.severity for i in issues))
+        manifest.finding_status_counts = {FindingStatus.DRAFT.value: len(issues)}
         manifest.complete(started, doc.page_count, len(issues))
 
         repo.add_progress(run_id, "reports", "Writing support reports.", 92)
         write_all_reports(out_dir, issues, page_infos, hits, manifest, config)
+        manifest.output_files = _manifest_outputs(out_dir)
+        write_manifest(out_dir, manifest)
         (out_dir / "run_inputs.json").write_text(
             json.dumps({"files": [file.model_dump(mode="json") for file in files], "validation_warnings": warnings}, indent=2),
             encoding="utf-8",
@@ -264,6 +314,26 @@ def run_project_review(
         repo.add_progress(run_id, "completed", f"Review completed with {len(issues)} draft finding(s).", 100)
     except Exception as exc:
         message = exc.message if hasattr(exc, "message") else str(exc)
+        failed_run = repo.get_run(run_id)
+        out_dir = Path(failed_run.output_dir) if failed_run else project.root_path / "outputs" / "runs" / run_id
+        failed_manifest = RunManifest(
+            input="",
+            output_dir=str(out_dir),
+            started_at=failed_run.started_at if failed_run and failed_run.started_at else now_iso(),
+            run_id=run_id,
+            project_id=project_id,
+            profile=profile,
+            app_version=APP_VERSION,
+            engine_version=ENGINE_VERSION,
+            status="failed",
+            input_files=[_manifest_file(file) for file in repo.list_files(project_id)],
+            warnings=warnings,
+            validation_warnings=list(warnings),
+            error_message=message or "Review run failed.",
+        )
+        failed_manifest.completed_at = now_iso()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_manifest(out_dir, failed_manifest)
         repo.update_run(run_id, status=RunStatus.FAILED, completed_at=now_iso(), warnings=warnings, error_message=message)
         repo.add_progress(run_id, "failed", message or "Review failed.", 100, level="error")
         if isinstance(exc, (ValidationError, MissingInputError)):

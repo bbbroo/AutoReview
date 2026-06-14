@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import Counter
+import json
 from pathlib import Path
 
 import fitz
@@ -9,6 +11,8 @@ from ..config import load_config
 from ..errors import MissingInputError, ValidationError
 from ..models import Issue
 from ..review_packet import build_single_review_packet
+from ..reports import write_manifest
+from ..models import RunManifest
 from ..schemas import (
     FileRecord,
     FileRole,
@@ -19,7 +23,7 @@ from ..schemas import (
     PacketFindingScope,
 )
 from ..storage.sqlite import ProjectRepository, new_id, now_iso
-from .review import REFERENCE_ROLE_TO_CONFIG_KEY, _reference_overrides, load_project_references
+from .review import APP_VERSION, _manifest_outputs, _reference_overrides, load_project_references
 
 
 def _finding_selected(finding: FindingRecord, settings: PacketExportSettings) -> bool:
@@ -80,6 +84,57 @@ def _supplemental_reference_files(files: list[FileRecord]) -> list[Path]:
     return out
 
 
+def _update_run_manifest_after_packet(
+    run_output_dir: Path,
+    packet_path: Path,
+    marked_path: Path,
+    all_findings: list[FindingRecord],
+    selected_count: int,
+    settings: PacketExportSettings,
+) -> None:
+    manifest_path = run_output_dir / "run_manifest.json"
+    if manifest_path.exists():
+        try:
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    else:
+        data = {}
+
+    manifest = RunManifest(
+        input=str(data.get("input", "")),
+        output_dir=str(data.get("output_dir", run_output_dir)),
+        started_at=str(data.get("started_at", now_iso())),
+        run_id=str(data.get("run_id", "")),
+        project_id=str(data.get("project_id", "")),
+        profile=str(data.get("profile", "")),
+        app_version=str(data.get("app_version", APP_VERSION)),
+        engine_version=str(data.get("engine_version", "")),
+        status=str(data.get("status", "completed")),
+        completed_at=str(data.get("completed_at", "")),
+        elapsed_seconds=float(data.get("elapsed_seconds", 0.0) or 0.0),
+        page_count=int(data.get("page_count", 0) or 0),
+        issue_count=int(data.get("issue_count", 0) or 0),
+        active_rule_count=int(data.get("active_rule_count", 0) or 0),
+        total_rule_count=int(data.get("total_rule_count", 0) or 0),
+        rule_counts=dict(data.get("rule_counts", {})),
+        severity_counts=dict(data.get("severity_counts", {})),
+        finding_status_counts=dict(Counter(finding.status.value for finding in all_findings)),
+        input_files=list(data.get("input_files", [])),
+        output_files=list(data.get("output_files", [])),
+        output_packet_path=str(packet_path),
+        marked_up_pdf_path=str(marked_path),
+        packet_export_settings=settings.model_dump(mode="json"),
+        packet_finding_count=selected_count,
+        settings_used=dict(data.get("settings_used", {})),
+        warnings=list(data.get("warnings", [])),
+        validation_warnings=list(data.get("validation_warnings", [])),
+        error_message=str(data.get("error_message", "")),
+    )
+    manifest.output_files = _manifest_outputs(run_output_dir)
+    write_manifest(run_output_dir, manifest)
+
+
 def export_review_packet(
     project_db_path: Path,
     run_id: str,
@@ -101,7 +156,8 @@ def export_review_packet(
     if not drawing.local_path.exists():
         raise MissingInputError(f"Drawing set PDF could not be found: {drawing.local_path}")
 
-    findings = [finding for finding in repo.list_findings(run_id) if _finding_selected(finding, settings)]
+    all_findings = repo.list_findings(run_id)
+    findings = [finding for finding in all_findings if _finding_selected(finding, settings)]
     issues = [_issue_from_finding(finding) for finding in findings]
 
     config = load_config(profile=run.profile)
@@ -128,6 +184,7 @@ def export_review_packet(
         doc.save(marked_path, garbage=4, deflate=True)
         supplemental = _supplemental_reference_files(files) if settings.include_reference_inputs else []
         build_single_review_packet(doc, issues, refs if settings.include_reference_inputs else {}, packet_path, config, supplemental_reference_files=supplemental)
+        _update_run_manifest_after_packet(run.output_dir, packet_path, marked_path, all_findings, len(issues), settings)
     except Exception as exc:
         raise ValidationError(f"Packet export failed: {exc}") from exc
     finally:

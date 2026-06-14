@@ -9,6 +9,10 @@ Set-Location $root
 Write-Host "Starting AutoReview desktop dev workflow..."
 Write-Host "Backend port: $BackendPort"
 
+if (Test-Path Env:ELECTRON_RUN_AS_NODE) {
+    Remove-Item Env:ELECTRON_RUN_AS_NODE
+}
+
 if (-not (Test-Path "node_modules")) {
     npm install
 }

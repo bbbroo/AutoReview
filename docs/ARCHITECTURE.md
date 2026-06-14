@@ -22,6 +22,16 @@ AutoReview is a local hybrid desktop system.
 8. The reviewer edits and classifies findings in the UI.
 9. Packet export rebuilds markups from stored reviewer-approved findings.
 
+## Shared Workflow Boundary
+
+The production MVP path is the persisted project workflow: desktop UI, FastAPI sidecar, SQLite project storage, Python worker, finding review, and packet export all operate through `ng_drawing_qa.services.review.run_project_review` and `ng_drawing_qa.services.packet.export_review_packet`.
+
+The legacy direct-PDF CLI remains available for engineers who need terminal output. It shares the same extraction utilities, deterministic rule registry, report writers, annotation code, and packet builder, but its `process_one_pdf` orchestration is still separate. Treat that as a known refactor target before broad production rollout.
+
+## Diagnostics
+
+Each persisted run writes `run_manifest.json` under `outputs/runs/{run_id}`. The manifest includes project/run identity, profile, app/engine versions, input file paths and hashes, active rule counts, issue and severity counts, reviewer status counts after packet export, output files, packet path, warnings, and failure messages when available.
+
 ## Project Folder
 
 ```text
