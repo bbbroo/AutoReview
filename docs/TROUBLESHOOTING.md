@@ -63,6 +63,10 @@ Reference validation reports blank mapped keys and duplicate mapped keys before 
 
 Default packet scope is accepted findings only. Accept findings in the review screen or choose a broader export scope.
 
+## Packet Export Is Blocked
+
+Packet export is only available after the selected review run has completed. If the run is queued, running, or failed, open Run Status, resolve any validation or worker errors, rerun the review, then export the packet.
+
 ## DOCX References
 
 DOCX files are accepted as supplemental references. The MVP renders extracted text where possible; direct Word print fidelity is planned later.

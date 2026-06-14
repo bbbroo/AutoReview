@@ -192,6 +192,14 @@ def test_reviewer_decision_history_tracks_finding_edits(tmp_path: Path):
     assert all(decision.reviewer == "local_user" for decision in updated.decision_history)
 
 
+def test_packet_export_requires_completed_run(tmp_path: Path):
+    project, repo = _seed_sample_project(tmp_path)
+    run = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "queued-export")
+
+    with pytest.raises(ValidationError, match="after a review run completes"):
+        export_review_packet(project.database_path, run.id, PacketExportSettings())
+
+
 def test_fingerprints_and_issue_ids_are_stable_across_repeated_runs(tmp_path: Path):
     project, repo = _seed_sample_project(tmp_path)
     run_one = repo.create_run(project.id, "balanced", project.root_path / "outputs" / "runs" / "run-one")

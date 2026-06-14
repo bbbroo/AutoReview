@@ -10,7 +10,7 @@ from apps.backend.autoreview_backend import worker
 from ng_drawing_qa.sample import generate_sample_project
 from ng_drawing_qa.schemas import RunStatus
 from ng_drawing_qa.services.review import run_project_review
-from ng_drawing_qa.storage.sqlite import AppIndex
+from ng_drawing_qa.storage.sqlite import AppIndex, ProjectRepository
 
 
 def _client(tmp_path: Path, monkeypatch) -> TestClient:
@@ -182,6 +182,20 @@ def test_backend_api_open_project_returns_friendly_error(tmp_path: Path, monkeyp
     body = response.json()
     assert body["detail"]["code"] == "MISSING_INPUT"
     assert "project.sqlite" in body["detail"]["message"]
+
+
+def test_backend_api_packet_export_requires_completed_run(tmp_path: Path, monkeypatch):
+    client = _client(tmp_path, monkeypatch)
+    project = _create_project(client, tmp_path)
+    repo = ProjectRepository(Path(project["database_path"]))
+    run = repo.create_run(project["id"], "balanced", Path(project["root_path"]) / "outputs" / "runs" / "queued")
+
+    response = client.post(f"/runs/{run.id}/export-packet", json={"finding_scope": "accepted_only"})
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["detail"]["code"] == "VALIDATION_ERROR"
+    assert "after a review run completes" in body["detail"]["message"]
 
 
 def test_backend_api_worker_start_failure_marks_run_failed(tmp_path: Path, monkeypatch):

@@ -20,6 +20,7 @@ from ..schemas import (
     PacketExportRecord,
     PacketExportSettings,
     PacketFindingScope,
+    RunStatus,
 )
 from ..storage.sqlite import ProjectRepository, new_id, now_iso
 from .review import APP_VERSION, _manifest_outputs, _reference_overrides, load_project_references
@@ -164,6 +165,11 @@ def export_review_packet(
     run = repo.get_run(run_id)
     if run is None:
         raise MissingInputError(f"Run not found: {run_id}")
+    if run.status != RunStatus.COMPLETED:
+        raise ValidationError(
+            f"Packet export is available after a review run completes. Current run status: {run.status.value}. "
+            "Open Run Status, resolve any run errors, and rerun the review before exporting."
+        )
     project = repo.get_project(run.project_id)
     if project is None:
         raise MissingInputError(f"Project not found: {run.project_id}")
