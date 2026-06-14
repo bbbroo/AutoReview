@@ -17,6 +17,7 @@ from ng_drawing_qa.schemas import (
 )
 from ng_drawing_qa.services.files import infer_file_role, ingest_file
 from ng_drawing_qa.services.packet import export_review_packet
+from ng_drawing_qa.services.profiles import export_review_profile, import_review_profile
 from ng_drawing_qa.services.projects import create_project
 from ng_drawing_qa.services.review import run_project_review
 from ng_drawing_qa.services.training import add_missed_finding, compare_against_golden, create_training_set, label_finding
@@ -107,3 +108,12 @@ def test_training_set_labels_and_golden_regression(tmp_path: Path):
     assert result.actual_count == len(findings)
     assert result.false_positive_count == 1
     assert result.missed_finding_count == 1
+
+
+def test_profile_export_import(tmp_path: Path):
+    project, _ = _seed_sample_project(tmp_path)
+    exported = export_review_profile(project.database_path, "balanced")
+    imported = import_review_profile(project.database_path, Path(exported["path"]))
+
+    assert Path(exported["path"]).exists()
+    assert imported["profile_name"] == "balanced"

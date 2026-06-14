@@ -37,6 +37,7 @@ from ng_drawing_qa.schemas import (
 )
 from ng_drawing_qa.services.files import ingest_file
 from ng_drawing_qa.services.packet import export_review_packet
+from ng_drawing_qa.services.profiles import export_review_profile, import_review_profile
 from ng_drawing_qa.services.projects import create_project, open_project
 from ng_drawing_qa.services.training import add_missed_finding, compare_against_golden, create_training_set, label_finding
 from ng_drawing_qa.services.validation import validate_project_inputs
@@ -67,6 +68,10 @@ class RunComparisonSummary(BaseModel):
 
 class RegressionRunRequest(BaseModel):
     run_id: str | None = None
+
+
+class ProfileImportRequest(BaseModel):
+    path: Path
 
 
 app = FastAPI(title="AutoReview Local Sidecar", version="0.3.0")
@@ -166,6 +171,18 @@ def rules():
 def profiles() -> dict[str, Any]:
     cfg = load_config()
     return cfg.get("profiles", {})
+
+
+@app.get("/projects/{project_id}/profiles/export/{profile_name}")
+def export_project_profile(project_id: str, profile_name: str) -> dict[str, Any]:
+    project = _project_or_404(project_id)
+    return export_review_profile(project.database_path, profile_name)
+
+
+@app.post("/projects/{project_id}/profiles/import")
+def import_project_profile(project_id: str, request: ProfileImportRequest) -> dict[str, Any]:
+    project = _project_or_404(project_id)
+    return import_review_profile(project.database_path, request.path)
 
 
 @app.post("/projects", response_model=ProjectRecord)
