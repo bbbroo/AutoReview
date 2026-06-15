@@ -11,7 +11,6 @@ import {
 } from "@fluentui/react-components";
 import {
   Add24Regular,
-  Alert24Regular,
   ArrowSync24Regular,
   ArrowUpload24Regular,
   CheckmarkCircle24Regular,
@@ -373,6 +372,16 @@ export default function App() {
     if (packetPath && window.autoreview) await window.autoreview.openPath(packetPath);
   }
 
+  async function openCurrentRunOutput() {
+    if (currentRun?.run.output_dir && window.autoreview) await window.autoreview.openPath(currentRun.run.output_dir);
+  }
+
+  async function openRunArtifact(fileName: string) {
+    if (!currentRun?.run.output_dir || !window.autoreview) return;
+    const base = currentRun.run.output_dir.replace(/[\\/]+$/, "");
+    await window.autoreview.openPath(`${base}/${fileName}`);
+  }
+
   function updatePacketMode(mode: PacketMode) {
     setPacketMode(mode);
     setPacketScope(defaultScopeForPacketMode(mode));
@@ -454,7 +463,7 @@ export default function App() {
                 </button>
               ))}
             </nav>
-            <button className="backend-card" type="button" onClick={() => void bootstrap()}>
+            <button className="backend-card" type="button" title="Refresh local FastAPI sidecar status and project lists." onClick={() => void bootstrap()}>
               <span className="backend-icon"><Cloud24Regular /></span>
               <span>
                 <strong>Backend Status</strong>
@@ -475,10 +484,7 @@ export default function App() {
               </div>
               <div className="topbar-actions">
                 {busy && <Spinner size="tiny" />}
-                <Button className="header-button" icon={<ArrowSync24Regular />} onClick={() => void bootstrap()}>Refresh</Button>
-                <span className="header-divider" />
-                <button className="icon-button" type="button" aria-label="Notifications"><Alert24Regular /></button>
-                <button className="avatar-button" type="button" aria-label="Account">AR</button>
+                <Button className="header-button" title="Reload local project, rule, and profile data from the sidecar." icon={<ArrowSync24Regular />} onClick={() => void bootstrap()}>Refresh</Button>
               </div>
             </header>
 
@@ -509,12 +515,12 @@ export default function App() {
             {section === "files" && (
               <section className="panel">
                 <div className="toolbar">
-                  <select value={newFileRole} onChange={(event) => setNewFileRole(event.target.value as FileRole)}>
+                  <select title="Choose the role to assign to newly ingested files. Roles drive reference mapping and rule inputs." value={newFileRole} onChange={(event) => setNewFileRole(event.target.value as FileRole)}>
                     {FILE_ROLES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
                   </select>
-                  <Button appearance="primary" icon={<Add24Regular />} disabled={!project} onClick={() => void browseAndIngestFiles()}>Add Files</Button>
-                  <Button icon={<CheckmarkCircle24Regular />} disabled={!project} onClick={() => void validateInputs()}>Validate</Button>
-                  <Button icon={<DocumentBulletList24Regular />} disabled={!project} onClick={() => void analyzeReferences()}>Analyze References</Button>
+                  <Button appearance="primary" title="Copy selected local drawings or references into this project and infer file roles." icon={<Add24Regular />} disabled={!project} onClick={() => void browseAndIngestFiles()}>Add Files</Button>
+                  <Button title="Check required drawing/reference inputs before running review." icon={<CheckmarkCircle24Regular />} disabled={!project} onClick={() => void validateInputs()}>Validate</Button>
+                  <Button title="Preview CSV/XLSX headers, mapped columns, row warnings, and saved profile mappings." icon={<DocumentBulletList24Regular />} disabled={!project} onClick={() => void analyzeReferences()}>Analyze References</Button>
                 </div>
                 <FileTable files={files} onRoleChange={updateRole} />
                 <ValidationList issues={validation} />
@@ -526,7 +532,7 @@ export default function App() {
               <section className="panel">
                 <div className="toolbar">
                   <label>Review profile</label>
-                  <select value={profile} onChange={(event) => setProfile(event.target.value)}>
+                  <select title="Select the deterministic rule profile used for the next run. Profiles control enabled rules and false-positive sensitivity." value={profile} onChange={(event) => setProfile(event.target.value)}>
                     {Object.keys(profiles).map((name) => <option key={name} value={name}>{name.replaceAll("_", " ")}</option>)}
                   </select>
                 </div>
@@ -537,8 +543,17 @@ export default function App() {
             {section === "run" && (
               <section className="panel">
                 <div className="run-summary">
-                  <Button appearance="primary" icon={<Play24Regular />} disabled={!project || busy || currentRun?.run.status === "running"} onClick={() => void startRun()}>
+                  <Button appearance="primary" title="Validate inputs, run deterministic PDF review, persist findings, and write trace outputs." icon={<Play24Regular />} disabled={!project || busy || currentRun?.run.status === "running"} onClick={() => void startRun()}>
                     Run Review
+                  </Button>
+                  <Button title="Open the current run output folder containing packets, trace files, manifests, and diagnostics." disabled={!currentRun?.run.output_dir || !window.autoreview} onClick={() => void openCurrentRunOutput()}>
+                    Open Output Folder
+                  </Button>
+                  <Button title="Open run_manifest.json for rule counts, placement counts, packet settings, and traceability diagnostics." disabled={!currentRun?.run.output_dir || !window.autoreview} onClick={() => void openRunArtifact("run_manifest.json")}>
+                    Run Manifest
+                  </Button>
+                  <Button title="Open finding_traceability.csv with issue IDs, fingerprints, placement diagnostics, reviewer status, and evidence fields." disabled={!currentRun?.run.output_dir || !window.autoreview} onClick={() => void openRunArtifact("finding_traceability.csv")}>
+                    Trace CSV
                   </Button>
                   <div>
                     <strong>{currentRun?.run.status ?? "not started"}</strong>
@@ -585,22 +600,22 @@ export default function App() {
               <section className="panel">
                 <div className="toolbar">
                   <label>Packet mode</label>
-                  <select value={packetMode} onChange={(event) => updatePacketMode(event.target.value as PacketMode)}>
+                  <select title="Choose packet contents: internal QA includes reviewer context, client review is cleaner, backcheck focuses unresolved/repeated items, and full debug includes diagnostics." value={packetMode} onChange={(event) => updatePacketMode(event.target.value as PacketMode)}>
                     <option value="internal_qa">internal QA</option>
                     <option value="client_review">client review</option>
                     <option value="backcheck">backcheck</option>
                     <option value="full_debug">full debug</option>
                   </select>
                   <label>Finding scope</label>
-                  <select value={packetScope} onChange={(event) => setPacketScope(event.target.value as PacketFindingScope)}>
+                  <select title="Choose which findings enter the packet. Accepted-only is the default and excludes rejected false positives." value={packetScope} onChange={(event) => setPacketScope(event.target.value as PacketFindingScope)}>
                     <option value="accepted_only">accepted only</option>
                     <option value="accepted_and_needs_review">accepted and needs review</option>
                     <option value="all_non_rejected">all non-rejected</option>
                     <option value="backcheck">backcheck</option>
                     <option value="all">all findings</option>
                   </select>
-                  <Button appearance="primary" icon={<DocumentPdf24Regular />} disabled={!currentRun} onClick={() => void exportPacket()}>Export Packet</Button>
-                  <Button disabled={!packetPath || !window.autoreview} onClick={() => void openPacket()}>Open Packet</Button>
+                  <Button appearance="primary" title="Create the single review packet PDF using shared CLI/UI export logic and edited reviewer wording." icon={<DocumentPdf24Regular />} disabled={!currentRun} onClick={() => void exportPacket()}>Export Packet</Button>
+                  <Button title="Open the last exported packet PDF in the system PDF viewer." disabled={!packetPath || !window.autoreview} onClick={() => void openPacket()}>Open Packet</Button>
                 </div>
                 {packetPath && <div className="output-path">{packetPath}</div>}
               </section>
@@ -609,7 +624,7 @@ export default function App() {
             {section === "history" && (
               <section className="panel">
                 <div className="toolbar">
-                  <Button disabled={history.length < 2} onClick={() => void compareLatestRuns()}>Compare Latest Runs</Button>
+                  <Button title="Compare the two newest completed runs for new, repeated, resolved, changed, and backcheck-required findings." disabled={history.length < 2} onClick={() => void compareLatestRuns()}>Compare Latest Runs</Button>
                 </div>
                 <RunHistory runs={history} onOpen={(run) => void loadRunDetails(run.id)} />
                 {comparison && <ComparisonSummary comparison={comparison} />}
@@ -685,21 +700,20 @@ function SetupSection({
         </div>
         <div className="setup-form">
           <label>Project name</label>
-          <Input value={projectName} contentAfter={<Sparkle24Regular className="input-sparkle" />} onChange={(_, data) => setProjectName(data.value)} />
+          <Input title="Name for the local project folder and SQLite review database." value={projectName} contentAfter={<Sparkle24Regular className="input-sparkle" />} onChange={(_, data) => setProjectName(data.value)} />
           <label>Project parent folder</label>
           <div className="path-row">
-            <Input placeholder="Select a folder or type a path" value={projectParent} onChange={(_, data) => setProjectParent(data.value)} />
-            <Button icon={<FolderOpen24Regular />} onClick={() => void chooseDirectory()}>Browse</Button>
+            <Input title="Parent folder where AutoReview will create or open a local project. No cloud sync is required." placeholder="Select a folder or type a path" value={projectParent} onChange={(_, data) => setProjectParent(data.value)} />
+            <Button title="Choose a local folder for the project." icon={<FolderOpen24Regular />} onClick={() => void chooseDirectory()}>Browse</Button>
           </div>
           <div className="button-row">
-            <Button appearance="primary" icon={<Add24Regular />} onClick={() => void createNewProject()}>Create Project</Button>
-            <Button icon={<FolderOpen24Regular />} onClick={() => void openExistingProject()}>Open Project</Button>
+            <Button appearance="primary" title="Create a local AutoReview project with its own database, inputs, profiles, and outputs." icon={<Add24Regular />} onClick={() => void createNewProject()}>Create Project</Button>
+            <Button title="Open an existing local AutoReview project folder." icon={<FolderOpen24Regular />} onClick={() => void openExistingProject()}>Open Project</Button>
           </div>
           <div className="info-callout">
             <span className="info-icon"><Info24Regular /></span>
             <div>
               <p>Projects contain your configuration, rules, and results in one place.</p>
-              <button type="button" className="learn-link">Learn more <ChevronRight24Regular /></button>
             </div>
           </div>
         </div>
@@ -708,12 +722,11 @@ function SetupSection({
       <div className="setup-card recent-card">
         <div className="recent-header">
           <h3>Recent Projects</h3>
-          <button type="button">View all <ChevronRight24Regular /></button>
         </div>
         {projects.length > 0 ? (
           <div className="recent-list">
             {projects.map((item) => (
-              <button key={item.id} onClick={() => void loadProjectData(item)}>
+              <button key={item.id} title="Open this local project and load its files, run history, references, and findings." onClick={() => void loadProjectData(item)}>
                 <strong>{item.name}</strong>
                 <span>{item.root_path}</span>
               </button>
@@ -745,7 +758,7 @@ function FileTable({ files, onRoleChange }: { files: FileRecord[]; onRoleChange:
         {files.map((file) => (
           <tr key={file.id}>
             <td>
-              <select value={file.role} onChange={(event) => void onRoleChange(file, event.target.value as FileRole)}>
+              <select title="File role controls which deterministic rules can use this input. Unknown files are preserved but not structurally reconciled." value={file.role} onChange={(event) => void onRoleChange(file, event.target.value as FileRole)}>
                 {FILE_ROLES.map((role) => <option key={role} value={role}>{roleLabel(role)}</option>)}
               </select>
             </td>
@@ -881,7 +894,7 @@ function ReferenceMappingEditor({
     <div className="mapping-editor">
       <div className="mapping-editor-header">
         <strong>Column Mapping</strong>
-        <Button size="small" icon={<Save24Regular />} onClick={() => void onSaveMapping(analysis.role, mapping)}>Save Mapping</Button>
+        <Button size="small" title="Save these column mappings to the project profile so future runs parse this reference consistently." icon={<Save24Regular />} onClick={() => void onSaveMapping(analysis.role, mapping)}>Save Mapping</Button>
       </div>
       <div className="mapping-editor-grid">
         {fields.map((field) => (
@@ -889,6 +902,7 @@ function ReferenceMappingEditor({
             <span>{fieldLabel(field)}</span>
             <select
               aria-label={`Map ${fieldLabel(field)} for ${analysis.file_name}`}
+              title={`Map the ${fieldLabel(field)} reference field to a CSV/XLSX column. Leave blank when the source does not provide it.`}
               value={mapping[field] ?? ""}
               onChange={(event) => updateField(field, event.target.value)}
             >
@@ -937,25 +951,30 @@ function FindingFilters({
 }) {
   return (
     <div className="filters">
-      <select value={filters.severity} onChange={(event) => setFilters({ ...filters, severity: event.target.value })}>
+      <select title="Filter by current reviewer severity. Low-confidence review prompts usually appear as Info or Minor." value={filters.severity} onChange={(event) => setFilters({ ...filters, severity: event.target.value })}>
         <option value="">severity</option>
         {SEVERITIES.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
+      <select title="Filter by reviewer decision status. Rejected findings are excluded from default packets." value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}>
         <option value="">status</option>
         {FINDING_STATUSES.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <select value={filters.discipline} onChange={(event) => setFilters({ ...filters, discipline: event.target.value })}>
+      <select title="Filter by engineering discipline or document-control owner area." value={filters.discipline} onChange={(event) => setFilters({ ...filters, discipline: event.target.value })}>
         <option value="">discipline</option>
         {disciplines.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <select value={filters.rule} onChange={(event) => setFilters({ ...filters, rule: event.target.value })}>
+      <select title="Filter by deterministic rule ID to inspect noisy or high-value rules." value={filters.rule} onChange={(event) => setFilters({ ...filters, rule: event.target.value })}>
         <option value="">rule</option>
         {ruleIds.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <Input placeholder="sheet" value={filters.sheet} onChange={(_, data) => setFilters({ ...filters, sheet: data.value })} />
-      <Input placeholder="search" value={filters.text} onChange={(_, data) => setFilters({ ...filters, text: data.value })} />
-      <Button onClick={() => setFilters(emptyFilters)}>Clear</Button>
+      <select title="Filter to findings flagged as possible RFIs or hide them while doing engineering QA triage." value={filters.rfi} onChange={(event) => setFilters({ ...filters, rfi: event.target.value })}>
+        <option value="">RFI</option>
+        <option value="true">RFI candidate</option>
+        <option value="false">not RFI</option>
+      </select>
+      <Input title="Filter to a sheet number or page label." placeholder="sheet" value={filters.sheet} onChange={(_, data) => setFilters({ ...filters, sheet: data.value })} />
+      <Input title="Search issue ID, subject, edited message, and matched drawing text." placeholder="search" value={filters.text} onChange={(_, data) => setFilters({ ...filters, text: data.value })} />
+      <Button title="Clear all finding filters and show the full current run." onClick={() => setFilters(emptyFilters)}>Clear</Button>
     </div>
   );
 }
@@ -988,8 +1007,8 @@ function FindingsTable({
               <strong>{finding.subject}</strong>
               <span>{finding.edited_message}</span>
               <div className="quick-actions">
-                <button onClick={(event) => { event.stopPropagation(); void onPatch(finding, { status: "Accepted" }); }}>accept</button>
-                <button onClick={(event) => { event.stopPropagation(); void onPatch(finding, { status: "Rejected" }); }}>reject</button>
+                <button title="Accept this finding for default packet export after evidence review." onClick={(event) => { event.stopPropagation(); void onPatch(finding, { status: "Accepted" }); }}>accept</button>
+                <button title="Reject this finding as a false positive or not applicable; default packets exclude it." onClick={(event) => { event.stopPropagation(); void onPatch(finding, { status: "Rejected" }); }}>reject</button>
               </div>
             </td>
             <td>{Math.round(finding.confidence * 100)}%</td>
@@ -1051,37 +1070,37 @@ function FindingDetail({
           <span>{finding.rule_id}</span>
         </div>
         <div className="button-row compact">
-          <Button icon={<CheckmarkCircle24Regular />} onClick={() => void onPatch(finding, { status: "Accepted" })}>Accept</Button>
-          <Button icon={<DismissCircle24Regular />} onClick={() => void onPatch(finding, { status: "Rejected" })}>Reject</Button>
+          <Button title="Mark as a reviewed finding that can appear in accepted-only packet exports." icon={<CheckmarkCircle24Regular />} onClick={() => void onPatch(finding, { status: "Accepted" })}>Accept</Button>
+          <Button title="Mark as a false positive or not applicable; rejected findings stay out of default packets." icon={<DismissCircle24Regular />} onClick={() => void onPatch(finding, { status: "Rejected" })}>Reject</Button>
         </div>
       </div>
 
       <label>Status</label>
-      <select aria-label="Finding status" value={finding.status} onChange={(event) => void onPatch(finding, { status: event.target.value as FindingStatus })}>
+      <select aria-label="Finding status" title="Reviewer decision status. Use Backcheck Required when a future revision must prove the issue was resolved." value={finding.status} onChange={(event) => void onPatch(finding, { status: event.target.value as FindingStatus })}>
         {FINDING_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
       </select>
 
       <label>Severity</label>
-      <select aria-label="Finding severity" value={finding.severity} onChange={(event) => void onPatch(finding, { severity: event.target.value as Severity })}>
+      <select aria-label="Finding severity" title="Reviewer-assigned impact level. Downgrade weak OCR/reference-only warnings instead of accepting them as confirmed defects." value={finding.severity} onChange={(event) => void onPatch(finding, { severity: event.target.value as Severity })}>
         {SEVERITIES.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
       </select>
 
       <label>Discipline</label>
-      <Input aria-label="Finding discipline" value={finding.discipline} onChange={(_, data) => void onPatch(finding, { discipline: data.value })} />
+      <Input aria-label="Finding discipline" title="Engineering discipline or team responsible for reviewing this draft comment." value={finding.discipline} onChange={(_, data) => void onPatch(finding, { discipline: data.value })} />
 
       <label>Owner</label>
-      <Input aria-label="Finding owner" value={owner} onChange={(_, data) => setOwner(data.value)} />
+      <Input aria-label="Finding owner" title="Optional local owner or reviewer responsible for follow-up." value={owner} onChange={(_, data) => setOwner(data.value)} />
 
       <label className="checkbox-row">
-        <input type="checkbox" checked={rfiCandidate} onChange={(event) => setRfiCandidate(event.target.checked)} />
+        <input aria-label="RFI candidate" title="Flag when this draft comment may need a formal RFI or client/design clarification." type="checkbox" checked={rfiCandidate} onChange={(event) => setRfiCandidate(event.target.checked)} />
         <span>RFI candidate</span>
       </label>
 
       <label>Edited packet comment</label>
-      <Textarea aria-label="Edited packet comment" value={message} resize="vertical" onChange={(_, data) => setMessage(data.value)} />
+      <Textarea aria-label="Edited packet comment" title="Reviewer wording used in packets. Edit deterministic draft text before accepting for client-facing output." value={message} resize="vertical" onChange={(_, data) => setMessage(data.value)} />
       <label>Reviewer notes</label>
-      <Textarea aria-label="Reviewer notes" value={notes} resize="vertical" onChange={(_, data) => setNotes(data.value)} />
-      <Button appearance="primary" icon={<Save24Regular />} onClick={() => void onPatch(finding, { edited_message: message, reviewer_notes: notes, owner, rfi_candidate: rfiCandidate })}>Save Finding</Button>
+      <Textarea aria-label="Reviewer notes" title="Internal notes for your local review record. Notes can document why a finding was accepted, rejected, or deferred." value={notes} resize="vertical" onChange={(_, data) => setNotes(data.value)} />
+      <Button appearance="primary" title="Save edited wording, reviewer notes, owner, and RFI flag to the local project database." icon={<Save24Regular />} onClick={() => void onPatch(finding, { edited_message: message, reviewer_notes: notes, owner, rfi_candidate: rfiCandidate })}>Save Finding</Button>
 
       <div className="trust-note">
         Deterministic draft finding. Review evidence and edit, accept, reject, or classify before packet export.
@@ -1204,13 +1223,13 @@ function TrainingSection({
   return (
     <section className="panel training-panel">
       <div className="toolbar">
-        <Button disabled={!project || !currentRun} onClick={() => void createTrainingFromRun()}>Create Training Set</Button>
-        <select value={selectedTrainingSetId} onChange={(event) => setSelectedTrainingSetId(event.target.value)}>
+        <Button title="Create a local golden training set from the current run's deterministic findings." disabled={!project || !currentRun} onClick={() => void createTrainingFromRun()}>Create Training Set</Button>
+        <select title="Choose the local training set used for false-positive labels, missed findings, and regression checks." value={selectedTrainingSetId} onChange={(event) => setSelectedTrainingSetId(event.target.value)}>
           <option value="">training set</option>
           {trainingSets.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
-        <Button disabled={!selectedTrainingSetId || !selectedFinding} onClick={() => void labelSelectedFalsePositive()}>Mark False Positive</Button>
-        <Button disabled={!selectedTrainingSetId} onClick={() => void runTrainingRegression()}>Run Regression</Button>
+        <Button title="Label the selected finding as a false positive so noisy rules can be tuned against local examples." disabled={!selectedTrainingSetId || !selectedFinding} onClick={() => void labelSelectedFalsePositive()}>Mark False Positive</Button>
+        <Button title="Compare the current deterministic outputs against the selected golden set." disabled={!selectedTrainingSetId} onClick={() => void runTrainingRegression()}>Run Regression</Button>
       </div>
       <div className="training-grid">
         <div>
@@ -1230,8 +1249,8 @@ function TrainingSection({
         </div>
         <div>
           <h3>Missed Finding</h3>
-          <Textarea value={missedMessage} resize="vertical" onChange={(_, data) => setMissedMessage(data.value)} />
-          <Button disabled={!selectedTrainingSetId || !missedMessage.trim()} onClick={() => void addMissedFromForm()}>Add Missed Finding</Button>
+          <Textarea title="Describe a real issue the rules missed. This becomes local evidence for rule gaps and tuning." value={missedMessage} resize="vertical" onChange={(_, data) => setMissedMessage(data.value)} />
+          <Button title="Add this missed issue to the selected local training set for regression and rule-gap tracking." disabled={!selectedTrainingSetId || !missedMessage.trim()} onClick={() => void addMissedFromForm()}>Add Missed Finding</Button>
           {regression && (
             <>
               <div className="regression-result">

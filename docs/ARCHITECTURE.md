@@ -18,7 +18,7 @@ AutoReview is a local hybrid desktop system.
 4. Validation checks paths, file type, PDF readability, searchability, table columns, reference mappings, blank keys, duplicate keys, and suspicious reference values.
 5. A review run is queued in SQLite.
 6. The sidecar launches an isolated Python worker process.
-7. The worker extracts text/coordinates, loads references, runs deterministic rules, writes support outputs, and persists findings.
+7. The worker extracts text/coordinates, loads references, runs deterministic rules with profile-controlled evidence thresholds, writes support outputs, and persists findings.
 8. The reviewer edits and classifies findings in the UI.
 9. Packet export rebuilds markups from stored reviewer-approved findings.
 
@@ -39,6 +39,8 @@ Each persisted run writes `run_manifest.json` under `outputs/runs/{run_id}`. The
 Each completed review run also writes `finding_traceability.csv` beside `issue_log.csv`. This CSV is the low-friction audit surface for comparing UI/backend/worker/CLI runs because it records issue ID, fingerprint, rule, status, severity, sheet/page, found text, confidence, and source for each persisted finding.
 
 Finding reviewer changes are stored in SQLite `finding_decisions`. Each changed field records the finding ID, issue ID, run/project IDs, previous value, new value, timestamp, and local reviewer marker. The MVP is local single-user, so the reviewer marker is `local_user` until a future team workflow adds identity.
+
+False-positive reduction is handled inside the deterministic rule layer and profile settings, not by a separate UI/backend path. Rules can suppress ambiguous tag hits, downgrade reference-only mismatches when page searchability is weak, require readable title-block evidence before field-level comments, and require explicit regulator context before checklist prompts. The same confidence/severity result is persisted, shown in the UI, exported to trace CSVs, and used by packet export.
 
 Run comparison reports new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and backcheck-required findings so reviewers can check whether prior revision comments were resolved.
 

@@ -16,6 +16,7 @@
 - FastAPI sidecar
 - project setup, file roles, validation, run status, finding edits, packet export
 - mocked React/API project-to-packet workflow coverage
+- practical UI tooltips and working local artifact shortcuts for run folders, manifests, trace CSVs, and packets
 
 ## Phase 3: Training And Regression
 
@@ -25,12 +26,14 @@
 - golden comparison
 - regression tests
 - per-rule accepted-rate and false-positive usefulness summaries
+- false-positive regression tests for weak title-block extraction, duplicate sheet trust, low-searchability reference-only mismatches, ambiguous tag hits, and regulator checklist detection
 
 ## Phase 4: Company Readiness
 
 - profile import/export UI
 - desktop reference mapping editor
 - real-project local smoke profile tuning
+- profile-controlled false-positive thresholds for title blocks, sheet numbers, reference-only mismatches, tag confidence, coating prompts, and regulator detection
 - richer diagnostics
 - revision comparison UI refinements
 - backcheck-required comparison workflow

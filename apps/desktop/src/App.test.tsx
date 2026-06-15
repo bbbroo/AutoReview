@@ -155,6 +155,12 @@ describe("AutoReview desktop shell", () => {
     expect(await screen.findByText("AutoReview")).toBeInTheDocument();
     expect(screen.getAllByText("Project Setup").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Findings Review")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Notifications")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Account")).not.toBeInTheDocument();
+    expect(screen.queryByText("Learn more")).not.toBeInTheDocument();
+    expect(screen.queryByText("View all")).not.toBeInTheDocument();
+    expect(screen.getByTitle("Reload local project, rule, and profile data from the sidecar.")).toBeInTheDocument();
+    expect(screen.getByTitle("Name for the local project folder and SQLite review database.")).toBeInTheDocument();
   });
 
   it("shows rule explanation, traceability, and decision history for a selected finding", async () => {
@@ -478,8 +484,16 @@ describe("AutoReview desktop shell", () => {
     fireEvent.click(screen.getByText("Run Status"));
     fireEvent.click(screen.getByText("Run Review"));
     await waitFor(() => expect(requests.some((request) => request.method === "POST" && request.path.endsWith("/runs"))).toBe(true));
+    fireEvent.click(await screen.findByText("Open Output Folder"));
+    fireEvent.click(screen.getByText("Run Manifest"));
+    fireEvent.click(screen.getByText("Trace CSV"));
+    expect(window.autoreview?.openPath).toHaveBeenCalledWith("C:/AutoReview/Pipeline Review/outputs/runs/run_1");
+    expect(window.autoreview?.openPath).toHaveBeenCalledWith("C:/AutoReview/Pipeline Review/outputs/runs/run_1/run_manifest.json");
+    expect(window.autoreview?.openPath).toHaveBeenCalledWith("C:/AutoReview/Pipeline Review/outputs/runs/run_1/finding_traceability.csv");
 
     fireEvent.click(screen.getByText("Findings Review"));
+    expect(screen.getByTitle("Filter by reviewer decision status. Rejected findings are excluded from default packets.")).toBeInTheDocument();
+    expect(screen.getByTitle("Filter to findings flagged as possible RFIs or hide them while doing engineering QA triage.")).toBeInTheDocument();
     expect(await screen.findByText("Reviewer action", {}, { timeout: 3500 })).toBeInTheDocument();
     expect(screen.getByText("Alias sheets and client title-block variants can cause noise.")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Accept"));
@@ -500,6 +514,8 @@ describe("AutoReview desktop shell", () => {
     await waitFor(() => expect(findings[1].status).toBe("Rejected"));
 
     fireEvent.click(screen.getByText("Packet Export"));
+    expect(screen.getByTitle("Choose packet contents: internal QA includes reviewer context, client review is cleaner, backcheck focuses unresolved/repeated items, and full debug includes diagnostics.")).toBeInTheDocument();
+    expect(screen.getByTitle("Choose which findings enter the packet. Accepted-only is the default and excludes rejected false positives.")).toBeInTheDocument();
     fireEvent.change(screen.getByDisplayValue("internal QA"), { target: { value: "client_review" } });
     fireEvent.click(screen.getByText("Export Packet"));
     expect(await screen.findByText(/Packet exported with 1 finding/)).toBeInTheDocument();

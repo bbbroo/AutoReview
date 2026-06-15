@@ -77,6 +77,17 @@ Start with the Findings Review panel and Training tab:
 4. Check per-rule accepted rate and false-positive count.
 5. Tune profile settings, reference mappings, aliases, ignored phrases, sheet-number patterns, title-block regions, OCR thresholds, or rule enablement before adding new rules.
 
+Useful local tuning controls:
+
+- For title-block noise, raise `review.title_block_min_extracted_fields`, `review.title_block_min_words`, or tune `title_block.regions`.
+- For duplicate-sheet noise, raise `review.sheet_number_min_title_fields` or fix the sheet-number title-block region.
+- For reference-only misses on scanned PDFs, improve OCR first; AutoReview downgrades these to informational warnings when `review.reference_only_min_searchable_page_ratio` is not met.
+- For bad OCR tag fragments, raise `review.min_tag_hit_confidence` or `review.min_tag_length`, then add aliases/ignore patterns for known client conventions.
+- For coating/CP review noise, raise `review.coating_note_min_distinct_terms` or disable `COATING_NOTE_CHECK` outside pipeline/corrosion reviews.
+- For regulator checklist noise, tune `review.regulator_detector_terms`; the rule should not run from generic valve hits alone.
+
+Use Run Status -> Open Output Folder, Run Manifest, and Trace CSV to inspect the exact rule IDs, confidences, fingerprints, placement types, and evidence fields behind a noisy run.
+
 ## Packet Export Is Blocked
 
 Packet export is only available after the selected review run has completed. If the run is queued, running, or failed, open Run Status, resolve any validation or worker errors, rerun the review, then export the packet.

@@ -20,6 +20,8 @@ Golden comparison reports:
 
 The accepted rate is a reviewer-trust tuning signal. Rules with many findings and low accepted rates should be reviewed for noisy matching, missing profile controls, unclear wording, or suppressions. The rule summary is not an AI training score and does not prove engineering correctness.
 
+For false-positive reduction, inspect low accepted-rate rules and then tune local profile settings such as title-block extraction thresholds, duplicate-sheet trust thresholds, reference-only searchability ratio, tag hit confidence, aliases, ignored phrases, and rule enablement. Keep representative false positives and missed findings in the local training set so future rule changes can prove they reduced noise without hiding true issues.
+
 ## Stored Data
 
 Training data lives under the project folder:

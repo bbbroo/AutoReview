@@ -49,8 +49,10 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 1. Start a review from Run Status.
 2. Confirm progress events update without freezing the UI.
 3. Confirm run ID, profile, output folder, start/completion times, warning count, and errors are visible.
-4. If a run fails, confirm the error text is friendly and the run remains in history.
-5. Confirm the run output folder contains `run_manifest.json`, support CSV/XLSX/HTML/Markdown files, and logs.
+4. Click Open Output Folder and confirm the run folder opens locally.
+5. Click Run Manifest and Trace CSV and confirm `run_manifest.json` and `finding_traceability.csv` open locally.
+6. If a run fails, confirm the error text is friendly and the run remains in history.
+7. Confirm the run output folder contains `run_manifest.json`, support CSV/XLSX/HTML/Markdown files, and logs.
 
 ## Findings Review
 
@@ -69,6 +71,7 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 13. Mark one finding as RFI candidate.
 14. Confirm changes persist after navigating away and back.
 15. Confirm Decision History lists each changed field with old value, new value, timestamp, and `local_user`.
+16. Hover or focus the severity/status/RFI/owner/comment controls and confirm tooltips explain when to accept, reject, downgrade, backcheck, or escalate to RFI.
 
 ## Packet Export
 
@@ -98,6 +101,13 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 17. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
 18. Change Packet Mode to full debug and confirm Finding Scope changes to all.
 19. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected, including page-level callouts for coordinate-less findings.
+20. Hover Packet Mode and Finding Scope and confirm tooltips explain accepted-only, backcheck, full debug, and rejected-finding behavior.
+
+## UI Control Intent
+
+1. Confirm there are no visible notification/account buttons, decorative "Learn more" buttons, or "View all" recent-project buttons that appear clickable without a real workflow.
+2. Confirm important visible controls either work, are disabled until their prerequisites exist, or explain their purpose with a tooltip.
+3. Confirm disabled packet/open-output controls become enabled after completing the required run/export step.
 
 ## Run History And Comparison
 

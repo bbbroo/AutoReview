@@ -29,8 +29,54 @@ def _hits_map(hits: list[Hit]):
     return out
 
 
-def _sheet_set(ctx: RuleContext) -> set[str]:
+def _review_setting(ctx: RuleContext, key: str, default: Any) -> Any:
+    return ctx.config.get("review", {}).get(key, default)
+
+
+def _title_field_count(pi) -> int:
+    fields = pi.title_block_fields or {}
+    return sum(1 for value in fields.values() if str(value or "").strip())
+
+
+def _has_reliable_sheet_number(ctx: RuleContext, pi) -> bool:
+    if not pi.sheet_number or pi.sheet_number.startswith("PAGE-"):
+        return False
+    min_fields = int(_review_setting(ctx, "sheet_number_min_title_fields", 1))
+    min_words = int(_review_setting(ctx, "sheet_number_min_words", ctx.config.get("pdf", {}).get("min_words_per_page", 20)))
+    return _title_field_count(pi) >= min_fields and pi.word_count >= min_words
+
+
+def _sheet_set(ctx: RuleContext, *, reliable_only: bool = False) -> set[str]:
+    if reliable_only:
+        return {pi.sheet_number for pi in ctx.page_infos if _has_reliable_sheet_number(ctx, pi)}
     return {pi.sheet_number for pi in ctx.page_infos if pi.sheet_number}
+
+
+def _page_by_sheet(ctx: RuleContext) -> dict[str, Any]:
+    return {pi.sheet_number: pi for pi in ctx.page_infos if pi.sheet_number}
+
+
+def _searchable_page_ratio(ctx: RuleContext) -> float:
+    if not ctx.page_infos:
+        return 1.0
+    min_words = int(ctx.config.get("pdf", {}).get("min_words_per_page", 20))
+    searchable = sum(1 for pi in ctx.page_infos if pi.word_count >= min_words and not pi.raster_only)
+    return searchable / len(ctx.page_infos)
+
+
+def _low_searchability(ctx: RuleContext) -> bool:
+    threshold = float(_review_setting(ctx, "reference_only_min_searchable_page_ratio", 0.75))
+    return _searchable_page_ratio(ctx) < threshold
+
+
+def _is_ambiguous_tag(ctx: RuleContext, hit: Hit) -> bool:
+    min_conf = float(_review_setting(ctx, "min_tag_hit_confidence", 0.70))
+    normalized = re.sub(r"[^A-Z0-9]", "", hit.normalized.upper())
+    if hit.confidence < min_conf:
+        return True
+    if len(normalized) < int(_review_setting(ctx, "min_tag_length", 4)):
+        return True
+    return not any(ch.isdigit() for ch in normalized)
 
 
 def _rfi_candidate(ctx: RuleContext, message: str) -> str:
@@ -63,24 +109,29 @@ def check_drawing_index(ctx: RuleContext):
     refs = _ref_map(ctx.references.get("drawing_index", []))
     if not refs:
         return
-    found = _sheet_set(ctx)
+    found = _sheet_set(ctx, reliable_only=True)
+    pages_by_sheet = _page_by_sheet(ctx)
+    weak_extraction = len(found) < max(1, len([pi for pi in ctx.page_infos if pi.sheet_number and not pi.sheet_number.startswith("PAGE-")]) // 2)
+    missing_confidence = 0.55 if weak_extraction or _low_searchability(ctx) else 0.90
+    missing_severity = "Info" if missing_confidence < 0.70 else None
     for sheet, rec in sorted(refs.items()):
         if sheet not in found:
+            warning = " Searchability/title-block extraction is weak, so treat this as a review warning before assuming the sheet is missing." if missing_severity else ""
             _add(ctx, "DRAWING_INDEX_RECONCILIATION", "NGQA - Sheet listed in index but not found",
-                 f"Sheet {rec.raw} exists in the drawing index but was not detected in the PDF set. Verify missing sheet, OCR issue, or title block extraction.",
-                 page_number=1, sheet_number=rec.raw, found_text=rec.raw, confidence=0.90)
+                 f"Sheet {rec.raw} exists in the drawing index but was not confidently detected in the PDF set. Verify missing sheet, OCR issue, or title block extraction.{warning}",
+                 page_number=1, sheet_number=rec.raw, found_text=rec.raw, severity=missing_severity, confidence=missing_confidence)
     for sheet in sorted(found - set(refs)):
         if sheet.startswith("PAGE-"):
             continue
+        pi = pages_by_sheet.get(sheet)
         _add(ctx, "DRAWING_INDEX_RECONCILIATION", "NGQA - PDF sheet not listed in drawing index",
              f"Sheet {sheet} was detected in the PDF but was not found in the drawing index. Verify whether the drawing index needs to be updated.",
-             page_number=1, sheet_number=sheet, found_text=sheet, severity="Minor", confidence=0.80)
+             page_number=pi.page_number if pi else 1, sheet_number=sheet, found_text=sheet, severity="Minor", confidence=0.80)
 
     # Compare revision/title/status when available.
-    pages_by_sheet = {pi.sheet_number: pi for pi in ctx.page_infos}
     for sheet, rec in refs.items():
         pi = pages_by_sheet.get(sheet)
-        if not pi:
+        if not pi or not _has_reliable_sheet_number(ctx, pi):
             continue
         rev_ref = rec.fields.get("revision", "")
         if rev_ref and pi.revision and rev_ref.strip().upper() not in pi.revision.upper():
@@ -97,15 +148,22 @@ def check_drawing_index(ctx: RuleContext):
 def check_title_block(ctx: RuleContext):
     if not is_rule_enabled(ctx.config, "TITLE_BLOCK_MISSING_FIELD"):
         return
-    required = ["sheet_number", "revision", "issue_date", "checked_by"]
+    required = list(_review_setting(ctx, "title_block_required_fields", ["sheet_number", "revision", "issue_date", "checked_by"]))
+    min_extracted = int(_review_setting(ctx, "title_block_min_extracted_fields", 2))
+    min_words = int(_review_setting(ctx, "title_block_min_words", 30))
     for pi in ctx.page_infos:
+        if pi.word_count < min_words or pi.raster_only:
+            continue
         fields = pi.title_block_fields or {}
+        if _title_field_count(pi) < min_extracted:
+            continue
         for field in required:
             val = (fields.get(field) or "").strip()
             if not val:
                 _add(ctx, "TITLE_BLOCK_MISSING_FIELD", "NGQA - Missing title block field",
-                     f"Title block field '{field}' appears blank or was not extracted. Verify manually.",
-                     page_number=pi.page_number, sheet_number=pi.sheet_number, found_text=field, confidence=0.60)
+                     f"Title block field '{field}' appears blank in an otherwise readable title block. Verify manually.",
+                     page_number=pi.page_number, sheet_number=pi.sheet_number, found_text=field,
+                     severity="Info", confidence=float(_review_setting(ctx, "title_block_missing_confidence", 0.55)))
 
 
 def check_duplicate_sheets(ctx: RuleContext):
@@ -113,14 +171,15 @@ def check_duplicate_sheets(ctx: RuleContext):
         return
     by_sheet = defaultdict(list)
     for pi in ctx.page_infos:
-        if not pi.sheet_number.startswith("PAGE-"):
+        if _has_reliable_sheet_number(ctx, pi):
             by_sheet[pi.sheet_number].append(pi)
     for sheet, rows in by_sheet.items():
         if len(rows) > 1:
             pages = ", ".join(str(r.page_number) for r in rows)
             _add(ctx, "DUPLICATE_SHEET_NUMBER", "NGQA - Duplicate sheet number",
                  f"Sheet number {sheet} appears on multiple PDF pages: {pages}. Verify duplicate sheet, title block, or extraction issue.",
-                 page_number=rows[0].page_number, sheet_number=sheet, found_text=sheet, confidence=0.90)
+                 page_number=rows[0].page_number, sheet_number=sheet, found_text=sheet,
+                 confidence=float(_review_setting(ctx, "duplicate_sheet_confidence", 0.85)))
 
 
 def reconcile_tags(ctx: RuleContext, hit_kind: str, ref_name: str, rule_id: str, label: str, discipline: str):
@@ -136,15 +195,21 @@ def reconcile_tags(ctx: RuleContext, hit_kind: str, ref_name: str, rule_id: str,
     max_per_tag = int(ctx.config.get("review", {}).get("suppress_repeated_findings_per_tag", 5))
     for val in sorted(hit_values - ref_values):
         for hit in hits[val][:max_per_tag]:
+            if _is_ambiguous_tag(ctx, hit):
+                continue
             msg = f"{label} '{hit.text}' was found on sheet {hit.sheet_number}, but was not found in the provided {ref_name.replace('_', ' ')}."
             _add(ctx, rule_id, f"NGQA - {label} not in reference list", msg,
                  page_number=hit.page_number, sheet_number=hit.sheet_number, found_text=hit.text,
                  context=hit.context, rect=hit.rect, discipline=discipline, rfi_candidate=_rfi_candidate(ctx, msg), confidence=0.85)
     for val in sorted(ref_values - hit_values):
         rec = refs[val]
+        low_search = _low_searchability(ctx)
         msg = f"{label} '{rec.raw}' exists in the provided {ref_name.replace('_', ' ')}, but was not found in searchable PDF text."
+        if low_search:
+            msg += " Searchability is weak, so this is a reference-only review warning rather than a confirmed drawing omission."
         _add(ctx, rule_id, f"NGQA - {label} listed but not found on drawings", msg,
-             page_number=1, sheet_number="Drawing Set", found_text=rec.raw, discipline=discipline, rfi_candidate=_rfi_candidate(ctx, msg), confidence=0.75)
+             page_number=1, sheet_number="Drawing Set", found_text=rec.raw, discipline=discipline,
+             severity="Info" if low_search else None, rfi_candidate=_rfi_candidate(ctx, msg), confidence=0.50 if low_search else 0.75)
 
 
 def check_reference_reconciliations(ctx: RuleContext):
@@ -188,7 +253,7 @@ def check_pressure_and_code(ctx: RuleContext):
                 rule_id = "TEST_PRESSURE_CHECK" if "TEST" in label else "PRESSURE_CONSISTENCY"
                 _add(ctx, rule_id, f"NGQA - {label.title()} conflict",
                      f"Multiple {label} values were found: {', '.join(values)}. Verify consistency against design basis, line list, and equipment ratings.",
-                     page_number=rows[0][0] + 1, sheet_number=rows[0][1], found_text=", ".join(values), confidence=0.80)
+                     page_number=rows[0][0] + 1, sheet_number=rows[0][1], found_text=rows[0][3], context=rows[0][3], confidence=0.80)
 
     if is_rule_enabled(ctx.config, "CODE_CONSISTENCY"):
         code_re = re.compile(ctx.config["regex"]["code"], re.IGNORECASE)
@@ -215,10 +280,11 @@ def check_material_and_coating(ctx: RuleContext):
                      page_number=page_index+1, sheet_number=sheet_number, found_text=", ".join(mats[:10]), confidence=0.65)
         if is_rule_enabled(ctx.config, "COATING_NOTE_CHECK"):
             coats = sorted({m.group(0).upper() for m in coating_re.finditer(text)})
-            if coats:
+            min_terms = int(_review_setting(ctx, "coating_note_min_distinct_terms", 2))
+            if len(coats) >= min_terms:
                 _add(ctx, "COATING_NOTE_CHECK", "NGQA - Coating/CP note review",
                      f"Coating/CP-related terms found on {sheet_number}: {', '.join(coats[:10])}. Verify coating and corrosion notes are consistent with project standards.",
-                     page_number=page_index+1, sheet_number=sheet_number, found_text=", ".join(coats[:10]), severity="Info", confidence=0.60)
+                     page_number=page_index+1, sheet_number=sheet_number, found_text=", ".join(coats[:10]), severity="Info", confidence=0.50)
 
 
 def check_regulator_relief_tiein(ctx: RuleContext):
@@ -227,7 +293,8 @@ def check_regulator_relief_tiein(ctx: RuleContext):
     if is_rule_enabled(ctx.config, "REGULATOR_STATION_CHECKLIST"):
         terms = [t.lower() for t in ctx.config.get("terms", {}).get("regulator_station", [])]
         combined = "\n".join(page_text.values())
-        regulator_present = "regulator" in combined or any(hits for hits in [ctx.hits.get("Valve", [])] if hits)
+        detector_terms = [t.lower() for t in _review_setting(ctx, "regulator_detector_terms", ["regulator", "regulating station", "reg station", "worker regulator", "monitor regulator"])]
+        regulator_present = any(term in combined for term in detector_terms)
         if regulator_present:
             for term in terms:
                 if term not in combined:

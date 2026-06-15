@@ -35,6 +35,21 @@ Every finding should include:
 - coordinates when available
 - false-positive notes in metadata that tell reviewers when the rule is likely to be noisy
 
+## False-Positive Controls
+
+Rules that depend on OCR text, title-block extraction, or reference reconciliation must separate confirmed drawing errors from weak-evidence review prompts. Use `review` settings in the profile for thresholds rather than hard-coding local assumptions.
+
+Current noisy-rule controls include:
+
+- `title_block_min_extracted_fields` and `title_block_min_words`: suppress missing title-block-field comments unless the title block was actually readable.
+- `sheet_number_min_title_fields` and `sheet_number_min_words`: require trusted sheet extraction before duplicate-sheet and drawing-index checks treat a sheet number as reliable.
+- `reference_only_min_searchable_page_ratio`: downgrade reference-only "listed but not found" mismatches when the drawing set is not searchable enough to prove absence.
+- `min_tag_hit_confidence` and `min_tag_length`: suppress ambiguous OCR/tag hits before comparing to reference lists.
+- `coating_note_min_distinct_terms`: keep coating/CP review prompts informational and avoid one-word noise.
+- `regulator_detector_terms`: require explicit regulator-station context before checklist prompts run.
+
+When evidence is weak, prefer one of these outcomes: suppress the finding, emit an informational review warning, lower confidence, or require a profile to enable the rule. Do not mark weak OCR/reference-only evidence as a confirmed engineering error.
+
 ## Tests
 
 Add tests for normalization, reference parsing, rule output, evidence fields, false-positive suppression, packet wording where applicable, and golden regression behavior. For rules that can create noisy findings, add at least one labeled false-positive or suppression-oriented test fixture.

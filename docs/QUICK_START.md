@@ -15,6 +15,8 @@ npm install
 
 Create a project, add a drawing set PDF, add optional CSV/XLSX reference files, validate inputs, review the reference preview/mappings, choose a profile, run review, review findings, then export the packet.
 
+If the first run is noisy, start with Findings Review, Run Status -> Trace CSV, and the Training tab. Reject representative false positives, check searchability/title-block warnings, tune local profile thresholds, then rerun before expanding rule coverage.
+
 ## Reference Preview
 
 On Input Files, use Validate and Analyze References before running QA. The preview shows:

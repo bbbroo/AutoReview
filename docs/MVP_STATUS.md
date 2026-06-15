@@ -32,6 +32,9 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Reviewer updates for status, severity, discipline, owner, edited message, RFI flag, and notes.
 - Reviewer decision history is persisted for changed finding fields and exposed through the findings API/UI.
 - Findings Review shows rule explanation, false-positive notes, confidence, matched text, source sheet/page, reference source fields when available, fingerprint, original/edited comments, notes, owner, RFI flag, reviewer action guidance, and decision history.
+- Findings Review filters, reviewer controls, packet controls, reference mapping selectors, run diagnostics, training labels, and comparison controls now include practical hover help for engineers reviewing deterministic draft findings.
+- Rule false-positive gates now reduce noisy findings from weak OCR/title-block evidence: missing title-block fields require a readable extracted title block, duplicate sheet numbers require trusted sheet extraction, low-searchability reference-only misses are downgraded to informational review warnings, ambiguous low-confidence tag hits are suppressed, coating prompts require multiple distinct terms, and the regulator checklist requires explicit regulator-station context.
+- Run Status includes working local shortcuts for the current output folder, `run_manifest.json`, and `finding_traceability.csv`.
 - Packet export after reviewer decisions.
 - Packet export is blocked until the selected review run is completed.
 - Default packet scope excludes rejected findings and includes accepted edited comments.
@@ -58,7 +61,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, text-search placement resolution, title-block region placement, reference-only classification, visible page-level fallback callouts for coordinate-less findings, packet markup placement counts, categorized run comparison including backcheck-required findings, training labels, accepted-rate rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel, reference preview/mapping editor, and a mocked project-to-packet workflow through the local API surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, text-search placement resolution, title-block region placement, reference-only classification, visible page-level fallback callouts for coordinate-less findings, packet markup placement counts, false-positive gating for weak title blocks, duplicate sheet extraction, low-searchability reference-only mismatches, ambiguous tag hits, and regulator checklist detection, categorized run comparison including backcheck-required findings, training labels, accepted-rate rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel, reference preview/mapping editor, removal of decorative dead controls, tooltip presence, local output/manifest/trace shortcuts, and a mocked project-to-packet workflow through the local API surface.
 
 Sample project smoke:
 
@@ -88,9 +91,8 @@ Private real-PDF smoke:
 - Decision history is local single-user only; there is no reviewer identity/permissions model by design.
 - DOCX support is text extraction only, not print-fidelity rendering.
 - Reference PDFs are preserved/rendered, but structured reconciliation still depends on CSV/XLSX columns.
-- Reference mapping editing is API-backed and previewed in the UI, but the UI does not yet provide a full column-mapping editor.
 - Title block extraction uses numeric configured regions and needs per-company tuning.
-- Large real drawings can generate noisy duplicate-sheet or low-searchability findings that need profile tuning.
+- Large real drawings can still generate low-searchability and reference-only review warnings that need profile tuning, though the noisiest field-level and checklist rules now require stronger evidence.
 - CLI output now includes a transient project structure (`project.sqlite`, `inputs`, `profiles`, `packets`) inside the requested output folder rather than only loose report files.
 - Electron packaging, installer, updater, signing, and release process are documented but not implemented.
 - No enterprise auth, licensing, cloud sync, or tenant model is implemented by design.
@@ -99,7 +101,7 @@ Private real-PDF smoke:
 
 - PDF text quality and OCR variability on scanned or mixed raster/vector drawings.
 - Company-specific title block regions and sheet-number conventions.
-- False positives in duplicate sheet and reference/callout checks on real project drawing sets.
+- False positives on proprietary drawing sets remain the main product risk; the current mitigation is reviewer-visible confidence/placement evidence, profile tuning, training labels, and downgraded/suppressed weak evidence.
 - CLI and UI now share the persisted workflow, but the terminal output folder layout changed and should be verified with internal users.
 - Electron/Vite/Vitest audit findings that require major dependency upgrade testing.
 
@@ -130,8 +132,8 @@ local_test_inputs/
 
 ## Next Development Phase
 
-1. Add automated UI/e2e tests around project setup, file selection, run status, findings edits, filters, and packet export.
+1. Add browser/Electron visual smoke coverage for the existing mocked React/API project-to-packet workflow.
 2. Add company-specific profile tuning from labeled real examples.
 3. Broaden golden regression sets with synthetic regulator station, P&ID, and drawing-index mismatch cases, then use per-rule summaries to tune noisy rules.
-4. Improve finding evidence display and rule explanation panels in the UI.
+4. Continue converting noisy low-confidence prompts into profile-controlled warnings or suppressions backed by local examples.
 5. Plan Electron/Vite/Vitest/Electron major dependency upgrades in a controlled compatibility branch.

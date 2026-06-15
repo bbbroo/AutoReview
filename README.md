@@ -13,7 +13,9 @@ The product output is one single-source review packet PDF: cover, review disclai
 - Reviewer workflow for accepting, rejecting, editing, reclassifying, and annotating findings before export.
 - Findings review trust panel with rule explanation, evidence, reviewer action guidance, owner/RFI controls, notes, and decision history.
 - Reference preview and profile-backed CSV/XLSX column mapping editor for common engineering reference lists.
-- Deterministic rules with metadata for UI display.
+- Deterministic rules with metadata, false-positive notes, confidence thresholds, and review/profile controls for noisy OCR/title-block/reference cases.
+- Run Status and Packet Export expose local artifacts such as run folders, manifests, trace CSVs, and packets directly from the UI.
+- Practical in-app tooltips explain packet scopes, finding statuses, confidence, reference mappings, training labels, and markup placement types.
 - Golden training set foundation for false positives, missed findings, and regression checks.
 
 See [Current MVP Status](docs/MVP_STATUS.md) for the latest verified architecture, known gaps, audit triage, and real-PDF smoke notes.

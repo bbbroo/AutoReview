@@ -176,6 +176,18 @@ DEFAULT_CONFIG: dict[str, Any] = {
         },
         "suppress_repeated_findings_per_tag": 5,
         "suppress_repeated_findings_per_rule_page": 10,
+        "title_block_required_fields": ["sheet_number", "revision", "issue_date", "checked_by"],
+        "title_block_min_extracted_fields": 2,
+        "title_block_min_words": 30,
+        "title_block_missing_confidence": 0.55,
+        "sheet_number_min_title_fields": 1,
+        "sheet_number_min_words": 20,
+        "duplicate_sheet_confidence": 0.85,
+        "reference_only_min_searchable_page_ratio": 0.75,
+        "min_tag_hit_confidence": 0.70,
+        "min_tag_length": 4,
+        "coating_note_min_distinct_terms": 2,
+        "regulator_detector_terms": ["regulator", "regulating station", "reg station", "worker regulator", "monitor regulator"],
     },
     "profiles": {
         "balanced": {

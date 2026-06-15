@@ -41,6 +41,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_confidence=0.90,
         required_inputs=[FileRole.DRAWING_INDEX],
         profiles=["balanced", "conservative", "aggressive"],
+        false_positive_notes="Missing-sheet warnings are downgraded when searchable text or title-block extraction is weak; tune title-block regions before treating them as confirmed omissions.",
     ),
     RuleMetadata(
         rule_id="TITLE_BLOCK_MISSING_FIELD",
@@ -60,6 +61,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_severity=Severity.MAJOR,
         default_confidence=0.90,
         profiles=["balanced", "conservative", "aggressive"],
+        false_positive_notes="Requires a reliable non-placeholder sheet number. Weak OCR/title-block extraction can hide or imitate duplicates.",
     ),
     RuleMetadata(
         rule_id="REVISION_MISMATCH",
@@ -90,6 +92,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_confidence=0.85,
         required_inputs=[FileRole.VALVE_LIST],
         profiles=["balanced", "conservative", "aggressive", "regulator_station", "p_and_id"],
+        false_positive_notes="Reference-only mismatches are downgraded when the drawing set has low searchable text. Alias tables and saved reference mappings reduce noise.",
     ),
     RuleMetadata(
         rule_id="LINE_NUMBER_RECONCILIATION",
@@ -100,6 +103,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_confidence=0.85,
         required_inputs=[FileRole.LINE_LIST],
         profiles=["balanced", "conservative", "aggressive", "pipeline_crossing"],
+        false_positive_notes="Short or low-confidence text hits are ignored; tune aliases and line-list mappings before accepting drawing/reference mismatches.",
     ),
     RuleMetadata(
         rule_id="INSTRUMENT_TAG_RECONCILIATION",
@@ -110,6 +114,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_confidence=0.85,
         required_inputs=[FileRole.INSTRUMENT_INDEX],
         profiles=["balanced", "conservative", "aggressive", "p_and_id"],
+        false_positive_notes="OCR can split loop tags or read bubbles incorrectly. Low-confidence hits are suppressed and reference-only misses are warnings when searchability is poor.",
     ),
     RuleMetadata(
         rule_id="EQUIPMENT_TAG_RECONCILIATION",
@@ -120,6 +125,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_confidence=0.80,
         required_inputs=[FileRole.EQUIPMENT_LIST],
         profiles=["balanced", "conservative", "aggressive"],
+        false_positive_notes="Equipment tag formats vary by client. Use aliases and inspect low-searchability warnings before accepting missing-equipment findings.",
     ),
     RuleMetadata(
         rule_id="PRESSURE_CONSISTENCY",
@@ -156,6 +162,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_severity=Severity.MINOR,
         default_confidence=0.65,
         profiles=["balanced", "aggressive", "pipeline_crossing"],
+        false_positive_notes="Multiple material terms on a detail sheet can be intentional. Treat this as a consistency review prompt, not an automatic error.",
     ),
     RuleMetadata(
         rule_id="COATING_NOTE_CHECK",
@@ -165,6 +172,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_severity=Severity.MINOR,
         default_confidence=0.65,
         profiles=["aggressive", "pipeline_crossing"],
+        false_positive_notes="Only fires when multiple coating/CP terms are present. It is an informational review prompt for standards consistency.",
     ),
     RuleMetadata(
         rule_id="REGULATOR_STATION_CHECKLIST",
@@ -174,7 +182,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_severity=Severity.MAJOR,
         default_confidence=0.70,
         profiles=["regulator_station", "balanced", "aggressive"],
-        false_positive_notes="Checklist rules are advisory and should be tuned to company/client standards.",
+        false_positive_notes="Now requires explicit regulator-station text, not just valve tags. Checklist rules are advisory and should be tuned to company/client standards.",
     ),
     RuleMetadata(
         rule_id="RELIEF_VENT_CHECKLIST",
@@ -184,6 +192,7 @@ RULE_METADATA: list[RuleMetadata] = [
         default_severity=Severity.MAJOR,
         default_confidence=0.75,
         profiles=["regulator_station", "balanced", "aggressive"],
+        false_positive_notes="Relief/vent terms in general notes can trigger review prompts. Verify nearby detail references before accepting.",
     ),
     RuleMetadata(
         rule_id="TIE_IN_CHECKLIST",
