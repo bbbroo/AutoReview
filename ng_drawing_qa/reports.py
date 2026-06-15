@@ -52,6 +52,13 @@ def write_finding_traceability(out_dir: Path, finding_trace: list[dict[str, Any]
         "found_text",
         "confidence",
         "source",
+        "coordinate_source",
+        "placement_type",
+        "placement_confidence",
+        "original_found_text",
+        "resolved_match_text",
+        "resolved_page_number",
+        "placement_warning",
     ]
     write_csv(out_dir / "finding_traceability.csv", finding_trace, fields)
 

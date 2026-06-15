@@ -141,6 +141,13 @@ export interface FindingEvidence {
   reason: string;
   context: string;
   matched_text: string;
+  coordinate_source: string;
+  placement_type: string;
+  placement_confidence: number;
+  original_found_text: string;
+  resolved_match_text: string;
+  resolved_page_number: number;
+  placement_warning: string;
   source_file: string;
   source_role?: FileRole;
   source_row_number?: number;

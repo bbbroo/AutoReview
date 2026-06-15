@@ -56,7 +56,7 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 
 1. Open Findings Review after a completed run.
 2. Filter by severity, status, discipline, rule, sheet, RFI, and text.
-3. Select a finding and confirm details show issue ID, message, original generated text, edited text, evidence, matched text, sheet/page, output PDF page, coordinates, confidence, fingerprint, rule metadata, false-positive notes, owner, RFI flag, and reviewer notes.
+3. Select a finding and confirm details show issue ID, message, original generated text, edited text, evidence, matched text, sheet/page, output PDF page, coordinates, placement type, coordinate source, placement confidence, placement warning, confidence, fingerprint, rule metadata, false-positive notes, owner, RFI flag, and reviewer notes.
 4. Confirm the detail panel says the finding is a deterministic draft finding, not an engineering approval.
 5. Confirm Rule Explanation shows rule ID/name, description, discipline, default severity, default confidence, required inputs, profiles, and false-positive notes.
 6. Confirm Finding Evidence shows why the item was flagged, what the reviewer should do next, matched text, context, sheet/page, fingerprint, and any linked reference source/row.
@@ -79,9 +79,13 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
 5. Confirm the PDF bookmark/sidebar outline includes the cover, issue index, critical/major list, marked-up drawing set, rendered reference inputs, and source map.
 6. Click at least one issue ID in the issue index and confirm it jumps to the related marked-up drawing page when the viewer supports internal links.
 7. On a marked-up drawing page, confirm coordinate-backed findings show a visible `AR-####` issue-ID label near the highlighted evidence.
-8. Confirm findings without usable coordinates but with a valid page number show a stacked page-level callout box on the related drawing page. The callout should include issue ID, severity, rule ID, and edited reviewer wording.
-9. Check `outputs/runs/{run_id}/run_manifest.json` and confirm `packet_markup_counts` reports coordinate-backed markups, fallback page callouts, and unplaced findings.
-10. Confirm the packet contains:
+8. Confirm resolved text-search findings show a rectangle around the searched text and are marked as `resolved_text_search` in finding evidence or diagnostics.
+9. Confirm title-block findings use the configured title-block region rather than a generic page callout when possible.
+10. Confirm findings without usable coordinates but with a valid page number show a stacked page-level callout box on the related drawing page. The callout should include issue ID, severity, rule ID, and edited reviewer wording.
+11. Confirm reference-only findings are present in the issue index/reference evidence but do not appear as misleading exact drawing-location rectangles.
+12. Check `outputs/runs/{run_id}/run_manifest.json` and confirm `packet_markup_counts` reports exact-location, resolved-search, title-block, page-level, reference-only, and unplaced counts.
+13. Open `outputs/runs/{run_id}/placement_debug.csv` and confirm placement type, coordinate source, confidence, resolved text, and warning fields are populated.
+14. Confirm the packet contains:
    - Cover/disclaimer.
    - Issue summary and issue index.
    - Critical/major list.
@@ -89,11 +93,11 @@ Use this checklist before handing the MVP to an internal engineering reviewer. A
    - Marked-up drawing pages.
    - Rendered reference input section.
    - Source map.
-11. Confirm rejected findings are absent from the default packet.
-12. Change Packet Mode to backcheck and confirm Finding Scope changes to backcheck.
-13. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
-14. Change Packet Mode to full debug and confirm Finding Scope changes to all.
-15. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected, including page-level callouts for coordinate-less findings.
+15. Confirm rejected findings are absent from the default packet.
+16. Change Packet Mode to backcheck and confirm Finding Scope changes to backcheck.
+17. Export a backcheck packet after marking a finding as Backcheck Required or Needs Review, then confirm accepted-only findings are absent and backcheck findings are present.
+18. Change Packet Mode to full debug and confirm Finding Scope changes to all.
+19. Export with a broader scope and confirm draft, non-rejected, or rejected findings appear when selected, including page-level callouts for coordinate-less findings.
 
 ## Run History And Comparison
 

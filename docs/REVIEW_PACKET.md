@@ -44,8 +44,11 @@ Generated packets include PDF bookmarks for the cover, issue index, critical/maj
 
 The Marked-Up Drawing Set uses two visible markup styles:
 
-- Exact-location markups: findings with valid coordinates get the existing rectangle markup around the matched drawing evidence plus a visible `AR-####` issue-ID label near the rectangle.
-- Page-level callouts: findings with a valid page number but missing, zero, or invalid coordinates get a stacked callout box on the related drawing page. The callout includes issue ID, severity, rule ID, and reviewer-edited message. This makes coordinate-less findings visible instead of silently dropping them.
+- Exact-location markups: findings with valid rule-provided hit coordinates get the existing rectangle markup around the matched drawing evidence plus a visible `AR-####` issue-ID label near the rectangle. These are reported as `exact_hit`.
+- Resolved text-search markups: findings without rule-provided coordinates but with searchable `found_text` are resolved back to a PDF text rectangle before export. These are reported as `resolved_text_search`.
+- Title-block region markups: title-block, revision, sheet-title, and duplicate-sheet findings use configured title-block regions when exact text coordinates are unavailable. These are reported as `title_block_region`.
+- Page-level callouts: findings with a valid page number but no reliable exact or resolved location get a stacked callout box on the related drawing page. The callout includes issue ID, severity, rule ID, and reviewer-edited message. These are reported as `page_level`.
+- Reference-only findings: findings for items listed in a reference file but not found on the drawing are not shown as misleading drawing-location rectangles. They remain in the issue index and reference evidence section and are reported as `reference_only`.
 
 If a finding cannot be placed because its page number is invalid or outside the drawing set, it is counted as unplaced in the run manifest.
 
@@ -55,4 +58,4 @@ The same stable issue ID appears in the UI, SQLite, PDF markups, issue index, ru
 
 Reference CSV/XLSX inputs are rendered into the packet when included, and the desktop reference mapping preview should be checked before export so reviewers can trust which columns drove list-based evidence.
 
-After packet export, `run_manifest.json` includes `packet_markup_counts` with `coordinate_backed_markups`, `fallback_page_callouts`, and `unplaced_findings`.
+After packet export, `run_manifest.json` includes `packet_markup_counts` with `exact_location_markups`, `resolved_search_markups`, `title_block_region_markups`, `fallback_page_callouts`, `reference_only_findings`, and `unplaced_findings`. The run output also includes `placement_debug.csv` with each attempted placement and the reason it succeeded or fell back.

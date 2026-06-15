@@ -14,6 +14,7 @@ from ..config import load_config
 from ..errors import MissingInputError, ReviewRunError, ValidationError
 from ..issue_builder import IssueBuilder
 from ..models import Issue, RunManifest
+from ..placement import resolve_issue_placements, write_placement_debug_csv
 from ..pdf_utils import extract_page_info, extract_word_hits, export_extracted_text, export_words_csv
 from ..reference import load_aliases, load_ignore_patterns, load_reference_records, validate_reference_records
 from ..reports import write_all_reports, write_finding_traceability, write_manifest
@@ -83,6 +84,13 @@ def _issue_to_finding(
         reason=issue.message,
         context=issue.context,
         matched_text=issue.found_text,
+        coordinate_source=issue.coordinate_source,
+        placement_type=issue.placement_type,
+        placement_confidence=issue.placement_confidence,
+        original_found_text=issue.original_found_text or issue.found_text,
+        resolved_match_text=issue.resolved_match_text,
+        resolved_page_number=issue.resolved_page_number,
+        placement_warning=issue.placement_warning,
         coordinates={"x0": issue.x0, "y0": issue.y0, "x1": issue.x1, "y1": issue.y1},
         rule_metadata=metadata.model_dump(mode="json") if metadata else {},
     )
@@ -186,6 +194,13 @@ def _finding_trace(record: FindingRecord) -> dict[str, Any]:
         "found_text": record.found_text,
         "confidence": record.confidence,
         "source": record.source,
+        "coordinate_source": record.evidence.coordinate_source,
+        "placement_type": record.evidence.placement_type,
+        "placement_confidence": record.evidence.placement_confidence,
+        "original_found_text": record.evidence.original_found_text,
+        "resolved_match_text": record.evidence.resolved_match_text,
+        "resolved_page_number": record.evidence.resolved_page_number,
+        "placement_warning": record.evidence.placement_warning,
     }
 
 
@@ -281,6 +296,8 @@ def run_project_review(
             run_warnings=warnings,
         )
         issues = run_all_rules(ctx)
+        placement_attempts = resolve_issue_placements(doc, issues, config)
+        write_placement_debug_csv(out_dir / "placement_debug.csv", placement_attempts)
 
         repo.add_progress(run_id, "persist", "Persisting findings with stable issue IDs.", 82)
         next_number = _next_issue_number(repo, project_id)

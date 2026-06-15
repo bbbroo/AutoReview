@@ -10,6 +10,7 @@ from ..annotations import annotate_pdf
 from ..config import load_config
 from ..errors import MissingInputError, ValidationError
 from ..models import Issue, RunManifest
+from ..placement import resolve_issue_placements, write_placement_debug_csv
 from ..review_packet import build_single_review_packet
 from ..reports import write_manifest
 from ..schemas import (
@@ -76,6 +77,13 @@ def _issue_from_finding(finding: FindingRecord) -> Issue:
         response=finding.reviewer_notes,
         source=finding.source,
         rfi_candidate="Yes" if finding.rfi_candidate else "No",
+        placement_type=finding.evidence.placement_type,
+        coordinate_source=finding.evidence.coordinate_source,
+        placement_confidence=finding.evidence.placement_confidence,
+        original_found_text=finding.evidence.original_found_text,
+        resolved_match_text=finding.evidence.resolved_match_text,
+        resolved_page_number=finding.evidence.resolved_page_number,
+        placement_warning=finding.evidence.placement_warning,
     )
 
 
@@ -98,6 +106,7 @@ def _update_run_manifest_after_packet(
     packet_path: Path,
     marked_path: Path,
     all_findings: list[FindingRecord],
+    selected_issues: list[Issue],
     selected_count: int,
     settings: PacketExportSettings,
     markup_counts: dict[str, int],
@@ -110,6 +119,23 @@ def _update_run_manifest_after_packet(
             data = {}
     else:
         data = {}
+
+    placement_by_issue_id = {issue.issue_id: issue for issue in selected_issues}
+    trace_rows = []
+    for finding in all_findings:
+        row = _finding_trace(finding)
+        issue = placement_by_issue_id.get(finding.issue_id)
+        if issue:
+            row.update({
+                "coordinate_source": issue.coordinate_source,
+                "placement_type": issue.placement_type,
+                "placement_confidence": issue.placement_confidence,
+                "original_found_text": issue.original_found_text,
+                "resolved_match_text": issue.resolved_match_text,
+                "resolved_page_number": issue.resolved_page_number,
+                "placement_warning": issue.placement_warning,
+            })
+        trace_rows.append(row)
 
     manifest = RunManifest(
         input=str(data.get("input", "")),
@@ -131,7 +157,7 @@ def _update_run_manifest_after_packet(
         severity_counts=dict(data.get("severity_counts", {})),
         finding_status_counts=dict(Counter(finding.status.value for finding in all_findings)),
         finding_fingerprints=[finding.fingerprint for finding in all_findings],
-        finding_trace=[_finding_trace(finding) for finding in all_findings],
+        finding_trace=trace_rows,
         input_files=list(data.get("input_files", [])),
         output_files=list(data.get("output_files", [])),
         output_packet_path=str(packet_path),
@@ -215,13 +241,15 @@ def export_review_packet(
 
     doc = fitz.open(drawing.local_path)
     try:
+        placement_attempts = resolve_issue_placements(doc, issues, config)
+        write_placement_debug_csv(run.output_dir / "placement_debug.csv", placement_attempts)
         markup_counts = annotate_pdf(doc, issues, config)
         marked_path = run.output_dir / f"{Path(drawing.file_name).stem}_reviewed_marked_up.pdf"
         marked_path.parent.mkdir(parents=True, exist_ok=True)
         doc.save(marked_path, garbage=4, deflate=True)
         supplemental = _supplemental_reference_files(files) if settings.include_reference_inputs else []
         build_single_review_packet(doc, issues, refs if settings.include_reference_inputs else {}, packet_path, config, supplemental_reference_files=supplemental)
-        _update_run_manifest_after_packet(run.output_dir, packet_path, marked_path, all_findings, len(issues), settings, markup_counts)
+        _update_run_manifest_after_packet(run.output_dir, packet_path, marked_path, all_findings, issues, len(issues), settings, markup_counts)
     except Exception as exc:
         raise ValidationError(f"Packet export failed: {exc}") from exc
     finally:

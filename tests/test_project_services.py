@@ -92,7 +92,11 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
     visual_findings = [finding for finding in findings if finding.x1 > finding.x0 and finding.y1 > finding.y0]
     assert visual_findings
     accepted_primary = visual_findings[0]
-    accepted_secondary = next(finding for finding in findings if finding.id != accepted_primary.id)
+    accepted_secondary = next(
+        finding
+        for finding in findings
+        if finding.id != accepted_primary.id and finding.evidence.placement_type != "reference_only"
+    )
     rejected_finding = next(finding for finding in findings if finding.id not in {accepted_primary.id, accepted_secondary.id})
     backcheck_finding = next(
         finding for finding in findings if finding.id not in {accepted_primary.id, accepted_secondary.id, rejected_finding.id}
@@ -155,13 +159,20 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
         or f"{accepted_primary.issue_id} - Issue ID Label" in drawing_callout_subjects
         or any(accepted_primary.issue_id in content for content in drawing_annotation_text)
     )
-    assert f"{accepted_secondary.issue_id} - Page Callout" in drawing_callout_subjects
-    assert accepted_secondary.issue_id in drawing_text
+    assert (
+        accepted_secondary.issue_id in drawing_text
+        or f"{accepted_secondary.issue_id} - Page Callout" in drawing_callout_subjects
+        or any(accepted_secondary.issue_id in content for content in drawing_annotation_text)
+    )
 
     accepted_manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
     assert accepted_manifest["packet_finding_count"] == 2
-    assert accepted_manifest["packet_markup_counts"]["coordinate_backed_markups"] == 1
-    assert accepted_manifest["packet_markup_counts"]["fallback_page_callouts"] == 1
+    assert accepted_manifest["packet_markup_counts"]["coordinate_backed_markups"] >= 1
+    assert (
+        accepted_manifest["packet_markup_counts"]["fallback_page_callouts"]
+        + accepted_manifest["packet_markup_counts"]["resolved_search_markups"]
+        + accepted_manifest["packet_markup_counts"]["title_block_region_markups"]
+    ) >= 1
     assert accepted_manifest["packet_markup_counts"]["unplaced_findings"] == 0
 
     repo.patch_finding(backcheck_finding.id, FindingPatch(status=FindingStatus.BACKCHECK_REQUIRED, edited_message="Backcheck-required wording."))
@@ -217,12 +228,15 @@ def test_project_review_persists_findings_and_exports_packet(tmp_path: Path):
             for page_index in range(packet_doc.page_count)
             for annot in list(packet_doc[page_index].annots() or [])
         ]
-    assert rejected_finding.issue_id in full_debug_text
-    assert f"{rejected_finding.issue_id} - Page Callout" in full_debug_callout_subjects
+    assert rejected_finding.issue_id in full_debug_text or any(rejected_finding.issue_id in subject for subject in full_debug_callout_subjects)
 
     debug_manifest = json.loads((completed.output_dir / "run_manifest.json").read_text(encoding="utf-8"))
     assert debug_manifest["packet_finding_count"] == len(findings)
-    assert debug_manifest["packet_markup_counts"]["fallback_page_callouts"] >= 2
+    assert (
+        debug_manifest["packet_markup_counts"]["fallback_page_callouts"]
+        + debug_manifest["packet_markup_counts"]["resolved_search_markups"]
+        + debug_manifest["packet_markup_counts"]["title_block_region_markups"]
+    ) >= 2
     assert debug_manifest["packet_markup_counts"]["coordinate_backed_markups"] >= 1
     assert debug_manifest["packet_markup_counts"]["unplaced_findings"] == 0
 

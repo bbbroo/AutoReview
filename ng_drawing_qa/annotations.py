@@ -2,11 +2,20 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any
-import math
 import textwrap
 import fitz
 
 from .models import Issue
+from .placement import (
+    EXACT_HIT,
+    PAGE_LEVEL,
+    REFERENCE_ONLY,
+    RESOLVED_TEXT_SEARCH,
+    TITLE_BLOCK_REGION,
+    UNPLACED,
+    has_valid_coordinates,
+    placement_counts,
+)
 
 
 def color_for(config: dict[str, Any], severity: str) -> tuple[float, float, float]:
@@ -16,11 +25,6 @@ def color_for(config: dict[str, Any], severity: str) -> tuple[float, float, floa
 
 def _rect(issue: Issue) -> fitz.Rect:
     return fitz.Rect(issue.x0, issue.y0, issue.x1, issue.y1)
-
-
-def _has_valid_coordinates(issue: Issue) -> bool:
-    values = [issue.x0, issue.y0, issue.x1, issue.y1]
-    return all(math.isfinite(float(value)) for value in values) and issue.x1 > issue.x0 and issue.y1 > issue.y0
 
 
 def _label_fill(color: tuple[float, float, float]) -> tuple[float, float, float]:
@@ -74,11 +78,13 @@ def add_issue_id_label(
 
 
 def _issue_content(issue: Issue) -> str:
+    placement = f"\nPlacement: {issue.placement_type}" if issue.placement_type else ""
+    warning = f"\nPlacement warning: {issue.placement_warning}" if issue.placement_warning else ""
     return (
         f"{issue.issue_id} | {issue.status}\n"
         f"Rule: {issue.rule_id}\n"
         f"Severity: {issue.severity}\n"
-        f"Confidence: {issue.confidence:.2f}\n\n"
+        f"Confidence: {issue.confidence:.2f}{placement}{warning}\n\n"
         f"{issue.message}"
     )
 
@@ -86,7 +92,7 @@ def _issue_content(issue: Issue) -> str:
 def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -> bool:
     if issue.page_number < 1 or issue.page_number > doc.page_count:
         return False
-    if not _has_valid_coordinates(issue):
+    if not has_valid_coordinates(issue):
         return False
 
     page = doc[issue.page_number - 1]
@@ -107,6 +113,15 @@ def add_issue_markup(doc: fitz.Document, issue: Issue, config: dict[str, Any]) -
         a.set_border(width=1.5)
         a.set_info(title="Natural Gas QA", subject=subject, content=content)
         a.update()
+    except Exception:
+        pass
+    add_issue_id_label(page, rect, issue, config, color, content)
+    try:
+        note_x = min(page.rect.width - 16, rect.x1 + 8)
+        note_y = max(16, rect.y0)
+        n = page.add_text_annot(fitz.Point(note_x, note_y), content)
+        n.set_info(title="Natural Gas QA", subject=subject, content=content)
+        n.update()
     except Exception:
         pass
     return True
@@ -150,17 +165,6 @@ def add_page_level_callout(doc: fitz.Document, issue: Issue, config: dict[str, A
         return True
     except Exception:
         return False
-
-    add_issue_id_label(page, rect, issue, config, color, content)
-
-    try:
-        note_x = min(page.rect.width - 16, rect.x1 + 8)
-        note_y = max(16, rect.y0)
-        n = page.add_text_annot(fitz.Point(note_x, note_y), content)
-        n.set_info(title="Natural Gas QA", subject=subject, content=content)
-        n.update()
-    except Exception:
-        pass
 
 
 def add_summary_page(doc: fitz.Document, issues: list[Issue], config: dict[str, Any]) -> None:
@@ -238,33 +242,23 @@ def add_sheet_summary_annotations(doc: fitz.Document, issues: list[Issue], confi
 
 
 def annotate_pdf(doc: fitz.Document, issues: list[Issue], config: dict[str, Any]) -> dict[str, int]:
-    stats = {
-        "coordinate_backed_markups": 0,
-        "fallback_page_callouts": 0,
-        "unplaced_findings": 0,
-    }
     if config.get("outputs", {}).get("dry_run", False) or not config.get("outputs", {}).get("annotate_pdf", True):
+        stats = placement_counts(issues)
         stats["unplaced_findings"] = len(issues)
         return stats
 
     fallback_counts_by_page: dict[int, int] = defaultdict(int)
     for issue in issues:
-        if issue.page_number < 1 or issue.page_number > doc.page_count:
-            stats["unplaced_findings"] += 1
+        if issue.placement_type in {REFERENCE_ONLY, UNPLACED}:
             continue
-        if _has_valid_coordinates(issue):
-            if add_issue_markup(doc, issue, config):
-                stats["coordinate_backed_markups"] += 1
-            else:
-                stats["unplaced_findings"] += 1
+        if issue.placement_type in {EXACT_HIT, RESOLVED_TEXT_SEARCH, TITLE_BLOCK_REGION}:
+            add_issue_markup(doc, issue, config)
             continue
-        fallback_index = fallback_counts_by_page[issue.page_number]
-        fallback_counts_by_page[issue.page_number] += 1
-        if add_page_level_callout(doc, issue, config, fallback_index):
-            stats["fallback_page_callouts"] += 1
-        else:
-            stats["unplaced_findings"] += 1
+        if issue.placement_type == PAGE_LEVEL:
+            fallback_index = fallback_counts_by_page[issue.page_number]
+            fallback_counts_by_page[issue.page_number] += 1
+            add_page_level_callout(doc, issue, config, fallback_index)
 
     add_sheet_summary_annotations(doc, issues, config)
     add_summary_page(doc, issues, config)
-    return stats
+    return placement_counts(issues)

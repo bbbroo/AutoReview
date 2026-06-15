@@ -91,6 +91,13 @@ function findingRecord(overrides: Partial<FindingRecord> = {}): FindingRecord {
       reason: "Sheet P-201 was referenced but not found in the drawing index.",
       context: "Callout references P-201.",
       matched_text: "P-201",
+      coordinate_source: "pdf_text_search",
+      placement_type: "resolved_text_search",
+      placement_confidence: 0.86,
+      original_found_text: "P-201",
+      resolved_match_text: "P-201",
+      resolved_page_number: 2,
+      placement_warning: "",
       source_file: "drawing_index.csv",
       source_role: "drawing_index",
       source_row_number: 12,
@@ -210,6 +217,13 @@ describe("AutoReview desktop shell", () => {
         reason: "Sheet P-201 was referenced but not found in the drawing index.",
         context: "Callout references P-201.",
         matched_text: "P-201",
+        coordinate_source: "rule_hit",
+        placement_type: "exact_hit",
+        placement_confidence: 1,
+        original_found_text: "P-201",
+        resolved_match_text: "P-201",
+        resolved_page_number: 2,
+        placement_warning: "",
         source_file: "drawing_index.csv",
         source_role: "drawing_index",
         source_row_number: 12,
@@ -250,6 +264,8 @@ describe("AutoReview desktop shell", () => {
     expect(await screen.findByText("Rule Explanation")).toBeInTheDocument();
     expect(screen.getByText("Finding Evidence")).toBeInTheDocument();
     expect(screen.getByText("Decision History")).toBeInTheDocument();
+    expect(screen.getByText("Placement type")).toBeInTheDocument();
+    expect(screen.getByText("exact_hit")).toBeInTheDocument();
     expect(screen.getByText("Drawing Index Reconciliation")).toBeInTheDocument();
     expect(screen.getByText("fingerprint123")).toBeInTheDocument();
     expect(screen.getByText("Draft -> Accepted")).toBeInTheDocument();

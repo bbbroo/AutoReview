@@ -1117,6 +1117,13 @@ function FindingDetail({
           <dt>Sheet/Page</dt><dd>{finding.sheet_number} / {finding.page_number}</dd>
           <dt>Output PDF page</dt><dd>{finding.output_pdf_page_number}</dd>
           <dt>Coordinates</dt><dd>{coordinateText(finding)}</dd>
+          <dt>Placement type</dt><dd>{finding.evidence.placement_type || "not resolved"}</dd>
+          <dt>Coordinate source</dt><dd>{finding.evidence.coordinate_source || "not resolved"}</dd>
+          <dt>Placement confidence</dt><dd>{finding.evidence.placement_confidence ? `${Math.round(finding.evidence.placement_confidence * 100)}%` : "not resolved"}</dd>
+          <dt>Original found text</dt><dd>{finding.evidence.original_found_text || finding.found_text || "none"}</dd>
+          <dt>Resolved match text</dt><dd>{finding.evidence.resolved_match_text || "not resolved"}</dd>
+          <dt>Resolved page</dt><dd>{finding.evidence.resolved_page_number || "not resolved"}</dd>
+          <dt>Placement warning</dt><dd>{finding.evidence.placement_warning || "none"}</dd>
           <dt>Confidence</dt><dd>{Math.round(finding.confidence * 100)}%</dd>
           <dt>Fingerprint</dt><dd className="mono">{finding.fingerprint}</dd>
           <dt>Reference source</dt><dd>{finding.evidence.source_file || "not linked"}</dd>

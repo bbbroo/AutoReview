@@ -39,8 +39,10 @@ The direct-PDF CLI remains available for terminal workflows. It now creates a tr
 - Packet PDFs include bookmarks for major sections and drawing-page finding clusters.
 - Issue IDs in the packet front matter link to the related marked-up drawing page when the PDF viewer supports internal links.
 - Coordinate-backed drawing markups include visible `AR-####` labels on marked-up drawing pages.
-- Coordinate-less findings with valid page numbers now receive visible stacked page-level callouts instead of being silently skipped.
-- Packet export manifests include markup placement counts for coordinate-backed markups, fallback page callouts, and unplaced findings.
+- Findings now carry placement diagnostics: placement type, coordinate source, placement confidence, original found text, resolved match text/page, and placement warning.
+- Coordinate-less findings with valid page numbers are resolved back to PDF text when possible, placed on title-block regions for title-block rules when applicable, or shown as visible stacked page-level callouts instead of being silently skipped.
+- Reference-only findings are classified separately and are not rendered as misleading exact drawing-location rectangles.
+- Packet export manifests include markup placement counts for exact, resolved-search, title-block, page-level, reference-only, and unplaced findings.
 - CLI direct-PDF runs use the same persisted review workflow as UI/backend runs while preserving existing commands.
 - Run history and comparison show new, resolved, repeated, carryover, status-changed, severity-changed, message-changed, and backcheck-required findings.
 - Training labels, missed findings, golden regression, and per-rule regression performance summaries with accepted count/rate.
@@ -56,7 +58,7 @@ npm --workspace apps/desktop run test
 npm --workspace apps/desktop run build
 ```
 
-Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, visible page-level fallback callouts for coordinate-less findings, packet markup placement counts, categorized run comparison including backcheck-required findings, training labels, accepted-rate rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel, reference preview/mapping editor, and a mocked project-to-packet workflow through the local API surface.
+Current Python suite covers backend API validation, project creation, file ingestion, role inference/assignment, reference analysis, saved reference mappings, malformed references, run creation, worker launch failure handling, friendly worker errors, finding persistence, finding updates, reviewer decision history, packet export, packet export status validation, packet modes/scopes, packet bookmarks, packet issue links, visible issue-ID labels on drawing markups, text-search placement resolution, title-block region placement, reference-only classification, visible page-level fallback callouts for coordinate-less findings, packet markup placement counts, categorized run comparison including backcheck-required findings, training labels, accepted-rate rule performance summaries, profile import/export, packet filtering, edited comments, rejected-finding exclusion, fingerprint stability, traceability exports, and CLI-vs-persisted workflow consistency. The React UI tests cover the finding trust panel, reference preview/mapping editor, and a mocked project-to-packet workflow through the local API surface.
 
 Sample project smoke:
 

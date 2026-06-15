@@ -211,6 +211,13 @@ class FindingEvidence(BaseModel):
     reason: str
     context: str = ""
     matched_text: str = ""
+    coordinate_source: str = ""
+    placement_type: str = ""
+    placement_confidence: float = 0.0
+    original_found_text: str = ""
+    resolved_match_text: str = ""
+    resolved_page_number: int = 0
+    placement_warning: str = ""
     source_file: str = ""
     source_role: FileRole | None = None
     source_row_number: int | None = None

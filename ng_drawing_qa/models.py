@@ -58,6 +58,13 @@ class Issue:
     source: str = "auto"
     ai_suggested_comment: str = ""
     rfi_candidate: str = "No"
+    placement_type: str = "unplaced"
+    coordinate_source: str = ""
+    placement_confidence: float = 0.0
+    original_found_text: str = ""
+    resolved_match_text: str = ""
+    resolved_page_number: int = 0
+    placement_warning: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
